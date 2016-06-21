@@ -118,14 +118,14 @@ def URL_scan(base_url, internal_page):
     # Prepare the file name for the corresponding website
     filename = main_directory+"web_content/"+base_url+"/cleartext/"+re.sub("/", '_', internal_page)+".txt"
      
+    #Remove trailing "/"    
+    while internal_page[-1:] == "/" :
+        internal_page = internal_page[:-1]
+     
     # If the page has not been visited, we just visit it
     if not os.path.isfile(filename):
         #First find whether it is a DTU page and store the base URL
         url_is_DTU = re.search('.*\.dtu.*', base_url)
-        
-        #Remove trailing "/"    
-        while internal_page[-1:] == "/" :
-            internal_page = internal_page[:-1]
 
         try:
             # we open the URL and read the content
@@ -163,9 +163,10 @@ def URL_scan(base_url, internal_page):
     else:
         #Load the list of links from the page in the folder
         filename = main_directory+"web_content/"+base_url+"/linklist/"+re.sub("/", '_', internal_page)+".p"   
-        print "- Opening file " + filename
+        #print "- Opening file " + filename
         link_list = pickle.load(open(filename, "rb" ))
         return link_list
+
 
 def create_dummy_files(base_url, internal_page):
     ''' Create empty files in the web content, so that broken URL are not tried several times '''
