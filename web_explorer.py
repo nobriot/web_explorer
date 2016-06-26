@@ -26,7 +26,7 @@ class webExplorer:
         self.main_directory = ""
         
         # A list of websites we do not want to visit at all.
-        self.url_blacklist= ".*google\..*|.*facebook\..*|.*instagram\..*|.*youtube\..*|.*twitter\..*|.*linkedin\..*|.*youtu\.be.*|.*goo\.gl.*|.*flickr\..*|.*bing..*" #All the websites we want to ignore
+        self.url_blacklist= ".*google\..*|.*facebook\..*|.*instagram\..*|.*youtube\..*|.*twitter\..*|.*linkedin\..*|.*youtu\.be.*|.*goo\.gl.*|.*flickr\..*|.*bing\..*|.*itunes\..*" #All the websites we want to ignore
         
         self.degree_depth_level = 3 #How many links we will follow (DTU -> site1 -> site2 is 3 levels)
         self.redirect_count = 3 #How many links we will follow (site1.page1 -> site1.page3 -> site1.page3 is 3 levels)
@@ -114,10 +114,10 @@ class webExplorer:
                     filename = self.main_directory+"web_content/"+webpage+"/external_urls.p" 
                     pickle.dump(external_base_urls,open(filename, "wb" ))
                     
-                    # Add all the new found websites to the list of website to visit at the next "Web level"
-                    print "Found external base URLs : "
-                    print external_base_urls
-                    self.to_visit_urls[i+1]=self.to_visit_urls[i+1].union(external_base_urls)
+                # Add all the new found websites to the list of website to visit at the next "Web level"
+                print "Found external base URLs : "
+                print external_base_urls
+                self.to_visit_urls[i+1]=self.to_visit_urls[i+1].union(external_base_urls)
     
                 print 'Finished webpage ' +webpage 
             print 'Finished web level %d' %(i) #So we know how far it went
@@ -295,12 +295,13 @@ class webExplorer:
                         found_base_url = found_base_url.group(0)
                         found_base_url = found_base_url.replace('https://','')
                         found_base_url = found_base_url.replace('http://','')
-                        found_base_url = found_base_url.replace('www.','')
+                        #found_base_url = found_base_url.replace('www.','')
                         found_base_url = found_base_url.replace(':80','')
                         found_base_url = found_base_url.replace(':443','')
                         found_base_url = found_base_url.replace('/','')
                         found_base_url = found_base_url.replace('?','')
                         found_base_url = found_base_url.replace('#','')
+                        found_base_url = found_base_url.replace('%20','')
                         
                         #We add it to the list if it is a different webpage
                         if webpage != found_base_url and found_base_url is not None:
@@ -325,7 +326,7 @@ class webExplorer:
         
         for link in link_list:
             keep_link = True
-            if ".pdf" in link or ".xls" in link or ".doc" in link or ".aspx" in link:
+            if ".pdf" in link or ".xls" in link or ".doc" in link or ".aspx" in link or ".ashx" in link:
                 keep_link = False
             if "javascript:" in link or "mailto:" in link:
                 keep_link = False

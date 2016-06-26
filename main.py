@@ -25,7 +25,7 @@ if __name__ == '__main__':
     print "2) Adding startpoint URLs : " + DTU_url
     myWebExplorer.set_explore_start_points(DTU_url)
     
-    myWebExplorer.degree_depth_level = 1
+    #myWebExplorer.degree_depth_level = 1
 
     # 4) Continue to explore the webpages until we reached degree_depth_level
     print "3) Exploring web links: this will take VERY long (weeks)"
