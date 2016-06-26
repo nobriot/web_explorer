@@ -18,10 +18,11 @@ class webExplorer:
     
     #Variable shared by all instances of webExplorer class
     # This is used to extract the URL of a website in the links (e.g. extracts google.fr from https://www.google.fr/something?query=myquery)    
-    base_url_regex = '^https?://.*?\..*?/|^https?://.*?\..*?\?|^https?://.*?\..*?#|^https?://.*?\..*?|^.*?\..*?/|^.*?\..*?\?|^.*?\..*?#|^.*?\..*'
+    base_url_regex = '^https?://.+?\..+?/|^https?://.+?\..+?\?|^https?://.+?\..+?#|^https?://.+?\..+|^.+?\..+?/|^.+?\..+?\?|^.+?\..+?#|^.+?\..+'
     
     #Constructor : variable init when creating the object. Initializing variables
     def __init__(self):
+        #This is the working directory
         self.main_directory = ""
         
         # A list of websites we do not want to visit at all.
@@ -74,45 +75,44 @@ class webExplorer:
         for i in range(self.degree_depth_level):
             self.to_visit_urls.append(set())            
             for webpage in self.to_visit_urls[i]:
-                # First check whether the URL is not just Google or Facebook, from the blacklist                
-                found_black_listed = re.match(self.url_blacklist, webpage)
-                if not found_black_listed:
-                    #Prepare the variable that we add into the future URL to visit
-                    external_base_urls = set()
+                
+                #Prepare the variable that we add into the future URL to visit
+                external_base_urls = set()
+                
+                # == The base URL has already been visited
+                if os.path.isdir(self.main_directory+"web_content/"+webpage): 
+                    print webpage + " has already been visited, loading external URLs..."
+                    filename = self.main_directory+"web_content/"+webpage+"/external_urls.p" 
+                    external_base_urls=pickle.load(open(filename, "rb" ))
+                
+                # == The base URL has not been visited yet
+                else: 
+                    # 1) Create a folder for the website in the content folder. Create sub-folders "cleartext" and "linklist"
+                    print "Creating folders for " + webpage
+                    self.create_folder(self.main_directory+"web_content/"+webpage)
+                    self.create_folder(self.main_directory+"web_content/"+webpage+"/cleartext")
+                    self.create_folder(self.main_directory+"web_content/"+webpage+"/linklist") 
                     
-                    # == The base URL has already been visited
-                    if os.path.isfile(self.main_directory+"web_content/"+webpage): 
-                        filename = self.main_directory+"web_content/"+webpage+"/external_urls.p" 
-                        external_base_urls=pickle.load(open(filename, "rb" ))
+                    # 2) Prepare a variable which contains all the external websites found from the website
+                    internal_urls = set()
+                    internal_urls.add("") #We put the base URL up on the list as the first internal URL to visit
                     
-                    # == The base URL has not been visited yet
-                    else: 
-                        # 1) Create a folder for the website in the content folder. Create sub-folders "cleartext" and "linklist"
-                        print "Creating folders for " + webpage
-                        self.create_folder(self.main_directory+"web_content/"+webpage)
-                        self.create_folder(self.main_directory+"web_content/"+webpage+"/cleartext")
-                        self.create_folder(self.main_directory+"web_content/"+webpage+"/linklist") 
-                        
-                        # 2) Prepare a variable which contains all the external websites found from the website
-                        internal_urls = set()
-                        internal_urls.add("") #We put the base URL up on the list as the first internal URL to visit
-                        
-                        # 3) Explore within the website
-                        for j in range(self.redirect_count): # How many times we will follow redirections within the same website
-                            # Scan the URL (retrieve the content, internal links and external links)
-                            print "Scanning "+webpage + " iteration " + str(j+1)
-                            for internal_page in internal_urls:
-                                all_links = self.URL_scan(webpage, internal_page)
-                                
-                                # Find the internal links and add them to the discovery for the next iteration
-                                internal_urls= internal_urls.union(self.find_internal_links(webpage,all_links))
-                                
-                                # Find external base URLs and add them to the list of external URLs.
-                                external_base_urls= external_base_urls.union(self.find_external_base_urls(webpage,all_links))
-                                
-                        # When done for the website, we save the external base URLs
-                        filename = self.main_directory+"web_content/"+webpage+"/external_urls.p" 
-                        pickle.dump(external_base_urls,open(filename, "wb" ))
+                    # 3) Explore within the website
+                    for j in range(self.redirect_count): # How many times we will follow redirections within the same website
+                        # Scan the URL (retrieve the content, internal links and external links)
+                        print "Scanning "+webpage + " iteration " + str(j+1)
+                        for internal_page in internal_urls:
+                            all_links = self.URL_scan(webpage, internal_page)
+                            
+                            # Find the internal links and add them to the discovery for the next iteration
+                            internal_urls= internal_urls.union(self.find_internal_links(webpage,all_links))
+                            
+                            # Find external base URLs and add them to the list of external URLs.
+                            external_base_urls= external_base_urls.union(self.find_external_base_urls(webpage,all_links))
+                            
+                    # When done for the website, we save the external base URLs
+                    filename = self.main_directory+"web_content/"+webpage+"/external_urls.p" 
+                    pickle.dump(external_base_urls,open(filename, "wb" ))
                     
                     # Add all the new found websites to the list of website to visit at the next "Web level"
                     print "Found external base URLs : "
@@ -267,19 +267,12 @@ class webExplorer:
                             relative_path = relative_path.split('?')[0]
                             internal_links.append(relative_path)
         
-        # Remove the links actually pointing at a file or the javascript crap
-        for link in internal_links:
-            if ".pdf" in link or ".xls" in link or ".doc" in link:
-                internal_links.remove(link)
-            if "javascript:" in link or "mailto:" in link:
-                internal_links.remove(link)
-            
         #Clean up all the double / from paths
         for i in range(len(internal_links)):
             while '//' in internal_links[i]:
                 internal_links[i]=internal_links[i].replace('//','/')
                 
-        return internal_links
+        return self.filter_links(internal_links)
     
     
     # function for finding which links belong to the given base URL
@@ -302,6 +295,7 @@ class webExplorer:
                         found_base_url = found_base_url.group(0)
                         found_base_url = found_base_url.replace('https://','')
                         found_base_url = found_base_url.replace('http://','')
+                        found_base_url = found_base_url.replace('www.','')
                         found_base_url = found_base_url.replace(':80','')
                         found_base_url = found_base_url.replace(':443','')
                         found_base_url = found_base_url.replace('/','')
@@ -311,11 +305,37 @@ class webExplorer:
                         #We add it to the list if it is a different webpage
                         if webpage != found_base_url and found_base_url is not None:
                             external_links.append(found_base_url)
+                            
         while '' in external_links:
             external_links.remove('')
+            
+        # Remove the links actually pointing at a file or the javascript crap
+        for link in external_links:
+            if ".pdf" in link or ".xls" in link or ".doc" in link:
+                external_links.remove(link)
+            if "javascript:" in link or "mailto:" in link:
+                external_links.remove(link)
                 
-        return external_links
+        return self.filter_links(external_links)
     
+    
+    # This function remove undesirable links from a list (filenames, javascript, or blacklisted URLs)
+    def filter_links(self, link_list):
+        filtered_link_list = []
+        
+        for link in link_list:
+            keep_link = True
+            if ".pdf" in link or ".xls" in link or ".doc" in link or ".aspx" in link:
+                keep_link = False
+            if "javascript:" in link or "mailto:" in link:
+                keep_link = False
+            if re.match(self.url_blacklist, link):
+                keep_link = False
+            
+            if keep_link:
+                filtered_link_list.append(link)
+            
+        return filtered_link_list
             
     def get_clean_text_from_html_content(self,html_text):
         ''' Takes the html_text and uses Beautiful Soup to filter out unwanted

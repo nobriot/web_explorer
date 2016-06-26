@@ -18,12 +18,14 @@ if __name__ == '__main__':
 
     # 2) Change the working directory
     myWebExplorer.set_main_directory("/home/shared/Scripts/web_explorer/")
-    print "1) changing working directory: "+ myWebExplorer.main_directory
+    print "1) Changing working directory: "+ myWebExplorer.main_directory
 
     # 3) Add DTU url as start point
     DTU_url = "www.dtu.dk"
     print "2) Adding startpoint URLs : " + DTU_url
     myWebExplorer.set_explore_start_points(DTU_url)
+    
+    myWebExplorer.degree_depth_level = 1
 
     # 4) Continue to explore the webpages until we reached degree_depth_level
     print "3) Exploring web links: this will take VERY long (weeks)"
