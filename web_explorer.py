@@ -26,7 +26,10 @@ class webExplorer:
         self.main_directory = ""
         
         # A list of websites we do not want to visit at all.
-        self.url_blacklist= ".*google\..*|.*facebook\..*|.*instagram\..*|.*youtube\..*|.*twitter\..*|.*linkedin\..*|.*youtu\.be.*|.*goo\.gl.*|.*flickr\..*|.*bing\..*|.*itunes\..*" #All the websites we want to ignore
+        self.url_blacklist= ".*google\..*|.*facebook\..*|.*instagram\..*|.*youtube\..*|.*twitter\..*|.*linkedin\..*|.*youtu\.be.*|.*goo\.gl.*|.*flickr\..*|.*bing\..*|.*itunes\..*|.*dropbox\..*" #All the websites we want to ignore
+        
+        #LIst of extension, that if we find in a URL, the URL will be discarded
+        self.extensions_to_ignore = ['pdf$','xls$','doc$','asp$','aspx$','ashx$','png$','jpg$','jpeg$','flv$','mp4$','mov$']
         
         self.degree_depth_level = 3 #How many links we will follow (DTU -> site1 -> site2 is 3 levels)
         self.redirect_count = 3 #How many links we will follow (site1.page1 -> site1.page3 -> site1.page3 is 3 levels)
@@ -81,9 +84,10 @@ class webExplorer:
                 
                 # == The base URL has already been visited
                 if os.path.isdir(self.main_directory+"web_content/"+webpage): 
-                    print webpage + " has already been visited, loading external URLs..."
-                    filename = self.main_directory+"web_content/"+webpage+"/external_urls.p" 
-                    external_base_urls=pickle.load(open(filename, "rb" ))
+                    if not re.match("^[\.]+$",webpage): ## TODO : This is ugly, should be removed if possible (added it because some of the external_urls.p contain . as a base URL and is not filtered when loaded again)
+                        print webpage + " has already been visited, loading external URLs..."
+                        filename = self.main_directory+"web_content/"+webpage+"/external_urls.p" 
+                        external_base_urls=pickle.load(open(filename, "rb" ))
                 
                 # == The base URL has not been visited yet
                 else: 
@@ -115,8 +119,8 @@ class webExplorer:
                     pickle.dump(external_base_urls,open(filename, "wb" ))
                     
                 # Add all the new found websites to the list of website to visit at the next "Web level"
-                print "Found external base URLs : "
-                print external_base_urls
+                #print "Found external base URLs : "
+                #print external_base_urls
                 self.to_visit_urls[i+1]=self.to_visit_urls[i+1].union(external_base_urls)
     
                 print 'Finished webpage ' +webpage 
@@ -181,7 +185,7 @@ class webExplorer:
             #Load the list of links from the page in the folder
             filename = self.main_directory+"web_content/"+base_url+"/linklist/"+re.sub("/", '_', internal_page)+".p"   
             #print "- Opening file " + filename
-            link_list = pickle.load(open(filename, "rb" ))
+            link_list = self.filter_links(pickle.load(open(filename, "rb" )))
             return link_list
     
     
@@ -271,6 +275,8 @@ class webExplorer:
         for i in range(len(internal_links)):
             while '//' in internal_links[i]:
                 internal_links[i]=internal_links[i].replace('//','/')
+            while '..' in internal_links[i]:
+                internal_links[i]=internal_links[i].replace('..','.')
                 
         return self.filter_links(internal_links)
     
@@ -302,6 +308,9 @@ class webExplorer:
                         found_base_url = found_base_url.replace('?','')
                         found_base_url = found_base_url.replace('#','')
                         found_base_url = found_base_url.replace('%20','')
+                  
+                        while ".." in found_base_url:
+                            found_base_url = found_base_url.replace('..','.')
                         
                         #We add it to the list if it is a different webpage
                         if webpage != found_base_url and found_base_url is not None:
@@ -309,13 +318,7 @@ class webExplorer:
                             
         while '' in external_links:
             external_links.remove('')
-            
-        # Remove the links actually pointing at a file or the javascript crap
-        for link in external_links:
-            if ".pdf" in link or ".xls" in link or ".doc" in link:
-                external_links.remove(link)
-            if "javascript:" in link or "mailto:" in link:
-                external_links.remove(link)
+        
                 
         return self.filter_links(external_links)
     
@@ -326,13 +329,19 @@ class webExplorer:
         
         for link in link_list:
             keep_link = True
-            if ".pdf" in link or ".xls" in link or ".doc" in link or ".aspx" in link or ".ashx" in link:
-                keep_link = False
+            for extension in self.extensions_to_ignore:
+                if extension in link :
+                    keep_link = False
             if "javascript:" in link or "mailto:" in link:
                 keep_link = False
-            if re.match(self.url_blacklist, link):
+            elif re.match("^[\.]+$",link): #If it is points only, throw it away
+                keep_link = False
+            elif re.match("^.+?@.+?\..+$",link): #If it is an email, throw it away
+                keep_link = False
+            elif re.match(self.url_blacklist, link):
                 keep_link = False
             
+            # Keep the link if it was not detected as a problem
             if keep_link:
                 filtered_link_list.append(link)
             
