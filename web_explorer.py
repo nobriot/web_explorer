@@ -568,7 +568,7 @@ class webExplorer:
             #Look at the returns when we are done
             total_words = len(word_list)
 
-            if 0: #Debug : Set 1 for seeing the details when calling the function
+            if self.debug:  #Debug : Set word count details
                 print "Danish word percentage : "+str(float(danish_word_count)/total_words*100)
                 print "English word percentage : "+str(float(english_word_count)/total_words*100)
 
@@ -689,14 +689,14 @@ class webExplorer:
 
             #We first find out what's the base_url (website url)
             CVR_regex_result = re.findall("((CVR|VAT)\D{0,12}(\d{2}\D{0,2}\d{2}\D{0,2}\d{2}\D{0,2}\d{2})(\D{0,2}\d{2}\D{0,2}\d{2})?)",html_page_cleartext)
-
+            
             if CVR_regex_result:
-        		#First results matches the whole stuff, 2nd matches the letters and 3rd matches the numbers
-        		# Example : CVR_regex_result = [('CVR number 05 5048 54','CVR','05 5048 54')]
-        		found_CVR = CVR_regex_result[0][2]
+                #First results matches the whole stuff, 2nd matches the letters and 3rd matches the numbers
+                # Example : CVR_regex_result = [('CVR number 05 5048 54','CVR','05 5048 54')]
+                found_CVR = CVR_regex_result[0][2]
                 if self.verbose:  #Anouncement message 
                     print "Found CVR number : " + found_CVR + " for " + files_path
-        		break #Exit the for loop, no need to browse more of the base website pages.
+                break #Exit the for loop, no need to browse more of the base website pages.
 
         if not found_CVR :  #Did not find CVR, but maybe we have a chance with ApS or A/S
             for filename in glob.glob(html_filename_mask):#Load the file cleartext content
