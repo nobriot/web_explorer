@@ -30,25 +30,31 @@ import urllib2 as url
 import re
 from bs4 import BeautifulSoup
 import pickle
-import cvr_registry
 
 # Class definition : webExplorer
 class webExplorer:
+    """ webExplorer Class. 
+    This class is used to explore websites and store their 
+    text content along with the list of links per page and a total amount of link
+    towards external websites. This class is also used for creating text corpora
+    and filtering websites displaying a Danish CVR number.
+    """
 
     #Variable shared by all instances of webExplorer class
     # This is used to extract the URL of a website in the links (e.g. extracts google.fr from https://www.google.fr/something?query=myquery)
     base_url_regex = '^https?://.+?\..+?/|^https?://.+?\..+?\?|^https?://.+?\..+?#|^https?://.+?\..+|^.+?\..+?/|^.+?\..+?\?|^.+?\..+?#|^.+?\..+'
 
     #Constructor : variable init when creating the object. Initializing variables
-    def __init__(self,redirect_count=None,degree_depth_level=None):
-        #This is the working directory
-        self.main_directory = ""
+    def __init__(self, main_directory="", redirect_count=None, degree_depth_level=None, verbose = False):
+        """ Class constructor, initialize instance variables """
+        #This is the working directory, initialized with the argument given to the constructor
+        self.set_main_directory(self, main_directory)
 
         # A list of websites we do not want to visit at all.
         self.url_blacklist= ".*google\..*|.*facebook\..*|.*instagram\..*|.*youtube\..*|.*twitter\..*|.*linkedin\..*|.*youtu\.be.*|.*goo\.gl.*|.*flickr\..*|.*bing\..*|.*itunes\..*|.*dropbox\..*" #All the websites we want to ignore
 
         #LIst of extension, that if we find in a URL, the URL will be discarded
-        self.extensions_to_ignore = ['pdf$','xls$','doc$','asp$','aspx$','ashx$','png$','jpg$','jpeg$','flv$','mp4$','mov$']
+        self.extensions_to_ignore = ['\.pdf.*|pdf$','\.xls.*|xls$','\.doc.*$','\.asp.*|asp$','\.aspx.*|aspx$','\.ashx.*|ashx$','\.png.*|png$','\.jpg.*|jpg$','\.jpeg.*|jpeg$','\.flv.*|flv$','\.mp4.*|mp4$','\.mov.*|mov$']
 
         # Set the exploration variables
         self.set_redirect_count(redirect_count)
@@ -56,22 +62,30 @@ class webExplorer:
 
         # different url list
         self.to_visit_urls = [] # Which URL are yet to visit
-        self.to_visit_urls.append(set())
+        self.to_visit_urls.append(set()) # We create a set for to_visit_urls[0]
 
+        # A verbose boolean variable : if set to True, the class prints out exec info
+        self.set_verbose(verbose) # Default is false.
+        self.debug = False #Debugging is disabled and can only be enabled with a function call, not with the constructor
+        
         #Dictionaries :
         self.danish_dict = None
         self.english_dict = None
 
         # CVR number registry
-        self.CVR_registry = CVRRegistry()
+        self.CVR_registry = dict() # We will store it the following way : CVR_registry['website'] = "12345343" or = None
 
         # Sets of base URLs (website url)
         self.DTU_base_urls=set() # Domain name part of DTU
         self.non_DTU_base_urls = set() # Domain name not part of DTU
 
     # Set the working directory for our object : (Where all the files will be stored)
-    def set_main_directory(self,new_directory):
-        self.main_directory = new_directory
+    def set_main_directory(self,new_directory=""):
+        if new_directory == "" :
+            self.main_directory = os.getcwd()+'/'
+        else:
+            self.main_directory = new_directory
+        #Ensure that where we are working is actually the directory
         os.chdir(self.main_directory)
 
     # Set explorer startpoints
@@ -79,29 +93,37 @@ class webExplorer:
         ''' This function takes a list of webpages as an argument and sets then
         into the start point for exploration'''
         if len(url_list) == 0:
-            print "Please specify a URL list to start from"
+            print "Please specify at least one URL/website to start from"
         else :
             # Filter what are base URLs in the arguement list and add them in the first level of the list of URL to visit.
             self.to_visit_urls[0]=self.to_visit_urls[0].union(self.find_external_base_urls(None,url_list))
 
     # Set number of redirections within single websites :
-    def set_redirect_count(redirect_count=None):
+    def set_redirect_count(self,redirect_count=None):
         ''' This function takes an int as an argument and sets the amount of
         redirections followed per website '''
         if redirect_count is not None and type(redirect_count) is int:
             self.redirect_count = redirect_count
         else:
-            self.redirect_count = 3 #How many links we will follow (site1.page1 -> site1.page3 -> site1.page3 is 3 levels)
+            self.redirect_count = 1 #How many links we will follow (site1.page1 -> site1.page3 -> site1.page3 is 3 levels)
 
     # Set the depth for external websites exploration :
-    def set_exploring_depth(degree_depth_level=None):
+    def set_exploring_depth(self,degree_depth_level=None):
         ''' This function takes an int as an argument and sets the depth of
         outside links explored from the starting websites
         Example : Start_site -> site1 -> site2 is 3 levels '''
         if degree_depth_level is not None and type(degree_depth_level) is int:
             self.degree_depth_level = degree_depth_level
         else:
-            self.degree_depth_level = 3 #How many links we will follow outside our start URLs (DTU -> site1 -> site2 is 3 levels)
+            self.degree_depth_level = 1 #How many links we will follow outside our start URLs (DTU -> site1 -> site2 is 3 levels)
+
+    # Sets the verbose for the class
+    def set_verbose(self,verbose=False):
+         self.verbose = verbose
+         
+    # Sets the verbose for the class
+    def set_debug(self,debug=False):
+         self.debug = debug
 
     # Functions
     def explore(self):
@@ -125,14 +147,16 @@ class webExplorer:
                 # == The base URL has already been visited
                 if os.path.isdir(self.main_directory+"web_content/"+webpage):
                     if not re.match("^[\.]+$",webpage): ## TODO : This is ugly, should be removed if possible (added it because some of the external_urls.p contain . as a base URL and is not filtered when loaded again)
-                        print webpage + " has already been visited, loading external URLs..."
+                        if self.verbose:  #Anouncement message                     
+                            print webpage + " has already been visited, loading external URLs..."
                         filename = self.main_directory+"web_content/"+webpage+"/external_urls.p"
                         external_base_urls=pickle.load(open(filename, "rb" ))
 
                 # == The base URL has not been visited yet
                 else:
                     # 1) Create a folder for the website in the content folder. Create sub-folders "cleartext" and "linklist"
-                    print "Creating folders for " + webpage
+                    if self.verbose:  #Anouncement message 
+                        print "Creating folders for " + webpage
                     self.create_folder(self.main_directory+"web_content/"+webpage)
                     self.create_folder(self.main_directory+"web_content/"+webpage+"/cleartext")
                     self.create_folder(self.main_directory+"web_content/"+webpage+"/linklist")
@@ -163,8 +187,9 @@ class webExplorer:
                 #print external_base_urls
                 self.to_visit_urls[i+1]=self.to_visit_urls[i+1].union(external_base_urls)
 
-                print 'Finished webpage ' +webpage
-            print 'Finished web level %d' %(i) #So we know how far it went
+                if self.verbose:  #Anouncement message
+                    print 'Finished webpage ' +webpage
+            print 'Finished web level %d' %(i+1) #So we know how far it went on the console
     ##End of explore()
 
     #This is the function to load the page, save them and find child links:
@@ -190,7 +215,8 @@ class webExplorer:
 
             try:
                 # we open the URL and read the content
-                #print " - Hit http://"+base_url+"/"+internal_page
+                if self.debug:  #Show the requested URL
+                    print " - Hit http://"+base_url+"/"+internal_page
                 html_response= url.urlopen("http://"+base_url+"/"+internal_page)
                 html_text= html_response.read()
 
@@ -212,9 +238,10 @@ class webExplorer:
                 #Find all the links in the webpage
                 link_list = self.find_child_links_from_html_soup(soup,base_url)
 
-                # Save the list of links in the folder
-                #print "- Saving file " + filename
+                # Save the list of links in the folder                
                 filename = self.main_directory+"web_content/"+base_url+"/linklist/"+re.sub("/", '_', internal_page)+".p"
+                if self.debug:  #Show the filename being saved
+                    print "- Saving file " + filename
                 pickle.dump(link_list,open(filename, "wb" ))
 
                 return link_list
@@ -224,13 +251,17 @@ class webExplorer:
         else:
             #Load the list of links from the page in the folder
             filename = self.main_directory+"web_content/"+base_url+"/linklist/"+re.sub("/", '_', internal_page)+".p"
-            #print "- Opening file " + filename
+            if self.debug:  #Show the filename being opened          
+                print "- Opening file " + filename
             link_list = self.filter_links(pickle.load(open(filename, "rb" )))
             return link_list
 
 
     def create_dummy_files(self, base_url, internal_page):
         ''' Create empty files in the web content, so that broken URL are not tried several times '''
+        if self.verbose:  #Anouncement message         
+            print "- WARNING : Could not open the following website : " + base_url
+            print "-> Creating dummy placeholder files for this site"
         filename = self.main_directory+"web_content/"+base_url+"/cleartext/"+re.sub("/", '_', internal_page)+".txt"
         pagefile = open(filename,'w+')
         pagefile.close()
@@ -369,16 +400,18 @@ class webExplorer:
         for link in link_list:
             keep_link = True
             for extension in self.extensions_to_ignore:
-                if extension in link :
+                if re.match(extension,link):
                     keep_link = False
-            if "javascript:" in link or "mailto:" in link:
-                keep_link = False
-            elif re.match("^[\.]+$",link): #If it is points only, throw it away
-                keep_link = False
-            elif re.match("^.+?@.+?\..+$",link): #If it is an email, throw it away
-                keep_link = False
-            elif re.match(self.url_blacklist, link):
-                keep_link = False
+            #No poisonous extension found, so we proceed.
+            if keep_link:
+                if "javascript:" in link or "mailto:" in link:
+                    keep_link = False
+                elif re.match("^[\.]+$",link): #If it is points only, throw it away
+                    keep_link = False
+                elif re.match("^.+?@.+?\..+$",link): #If it is an email, throw it away
+                    keep_link = False
+                elif re.match(self.url_blacklist, link):
+                    keep_link = False
 
             # Keep the link if it was not detected as a problem
             if keep_link:
@@ -551,14 +584,15 @@ class webExplorer:
 
 
     def create_R_corpus(self,language):
-        ''' Create a corpus of files for R from the url_tree variable.
+        ''' Create a corpus of files for R from the working directory.
         - language parameter has to a supported language by find_language(). Currently it is
         either "Danish" or "English"
         The corpus is placed in the corpus/ folder, followed by the language'''
 
         #Check whether the language is supported :
         if language not in ['English','Danish']:
-            print('Input language is incorrect')
+            print 'ERROR : Input language is incorrect : ' + language
+            print 'The corpus will not be created. Exiting...'
             return
 
         #We make the process for each Base URL :
@@ -626,13 +660,55 @@ class webExplorer:
         return filtered_text
 
 
-
-
-
     def create_folder(self,folder_name):
         ''' Simple function taking a folder name and create it into the current working directory.'''
         try:
             if not os.path.exists(folder_name):
                 os.makedirs(folder_name)
         except:
-            print "Could not create folder '"+folder_name+"'. Expect the script to experience problems."
+            print "ERROR : Could not create folder '"+folder_name+"'. Expect the script to experience problems."
+            
+    
+    
+    def find_CVR_number(self, files_path):
+        ''' Function scanning the content of text files (with .txt extension) 
+        in a folder and finds out whether it contains a CVR number.
+        Returns : 
+        - None if nothing found, 
+        - ApS if no CVR is found but ApS is present in the site
+        - A string with the CVR number if CVR is found'''
+        #We declare our variables.
+        found_CVR = None
+        html_filename_mask = files_path+"/*.txt"
+
+        #We repeat for each file starting with the base URL.
+        for filename in glob.glob(html_filename_mask):#Load the file cleartext content
+            html_page_file = open(filename,'r')
+            html_page_cleartext = html_page_file.read()
+            html_page_file.close()
+
+            #We first find out what's the base_url (website url)
+            CVR_regex_result = re.findall("((CVR|VAT)\D{0,12}(\d{2}\D{0,2}\d{2}\D{0,2}\d{2}\D{0,2}\d{2})(\D{0,2}\d{2}\D{0,2}\d{2})?)",html_page_cleartext)
+
+            if CVR_regex_result:
+        		#First results matches the whole stuff, 2nd matches the letters and 3rd matches the numbers
+        		# Example : CVR_regex_result = [('CVR number 05 5048 54','CVR','05 5048 54')]
+        		found_CVR = CVR_regex_result[0][2]
+                if self.verbose:  #Anouncement message 
+                    print "Found CVR number : " + found_CVR + " for " + files_path
+        		break #Exit the for loop, no need to browse more of the base website pages.
+
+        if not found_CVR :  #Did not find CVR, but maybe we have a chance with ApS or A/S
+            for filename in glob.glob(html_filename_mask):#Load the file cleartext content
+                html_page_file = open(filename,'r')
+                html_page_cleartext = html_page_file.read()
+                html_page_file.close()#Did not find CVR, but maybe we have a chance with ApS or A/S
+                APS_regex_result = re.findall("(ApS|A/S)",html_page_cleartext)
+                if APS_regex_result:
+                    found_CVR = "ApS"
+                    if self.verbose:  #Anouncement message                         
+                        print "Found ApS for website : " + files_path
+                    break
+
+        #Return the found CVR number.
+        return found_CVR

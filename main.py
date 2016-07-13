@@ -25,29 +25,24 @@ Last modified : 10/07/2016 by Nicolas Obriot
 
 #%% First section, all the different imports.
 import web_explorer
-import argparse
 
 #%%  Main execution : We call the functions we want
 if __name__ == '__main__':
     print "Hello, I am the main"
 
     #1) Declare a webExplorer instance, using 3 redirect per website and 3 depths levels
-    myWebExplorer = web_explorer.webExplorer(3,3)
+    myWebExplorer = web_explorer.webExplorer("/home/shared/Scripts/web_explorer/",3,3)
 
-    # 2) Change the working directory
-    myWebExplorer.set_main_directory("/home/shared/Scripts/web_explorer/")
-    print "1) Changing working directory: "+ myWebExplorer.main_directory
-
-    # 3) Add DTU url as start point
+    # 2) Add DTU url as start point
     DTU_url = "www.dtu.dk"
-    print "2) Adding startpoint URLs : " + DTU_url
+    print "1) Adding startpoint URLs : " + DTU_url
     myWebExplorer.set_explore_start_points(DTU_url)
 
     #myWebExplorer.set_redirect_count(3)
     #myWebExplorer.set_exploring_depth(3)
 
-    # 4) Continue to explore the webpages until we reached degree_depth_level
-    print "3) Exploring web links: this will take VERY long (weeks)"
+    # 3) Continue to explore the webpages until we reached degree_depth_level
+    print "2) Exploring web links: this will take VERY long (weeks)"
     myWebExplorer.explore()
 
     # 5) Create a R corpus for a certain language - Stored in "main_directory"/web_content/corpus/"Language"

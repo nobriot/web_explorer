@@ -32,20 +32,21 @@ if __name__ == '__main__':
 
     # First using the arg parsing
     parser = argparse.ArgumentParser(prog='webExplore.py', description='Command line utility for using the Web_explorer Program. Specify a starting point URL and various script parameters, and the script will scan the websites and store the content in the current directory or the directory that has been passed as argument.')
-    parser.add_argument('startWebsite', dest='start_website', nargs='+', help='Defines a starting website for the exploration. Several websites can be specified')
-    parser.add_argument('-d','--directory', type=str,dest='working_directory', help='Defines a directory to use for storing file content. Uses the current directory if this argument is not specified')
-    parser.add_argument('-r', '--redirect-count',type=int,dest='redirect_count', metavar='RedirectCount', help='Defines how many redirections are followed within a website when scanning it')
-    parser.add_argument('-l', '--depth-level',type=int,dest='depth_level', metavar='DepthLevel', help='Defines the level depth of the web exploration.')
+    parser.add_argument('start_website', nargs='+', help='Defines a starting website for the exploration. Several websites can be specified')
+    parser.add_argument('-d','--directory', type=str, dest='working_directory', metavar='WorkingDirectory', help='Defines a directory to use for storing file content. Uses the current directory if this argument is not specified')
+    parser.add_argument('-r', '--redirect-count', type=int, dest='redirect_count', metavar='RedirectCount', help='Defines how many redirections are followed within a website when scanning it')
+    parser.add_argument('-l', '--depth-level', type=int, dest='depth_level', metavar='DepthLevel', help='Defines the level depth of the web exploration.')
+    parser.add_argument('-v','--verbose', action='store_true', help='Verbose mode')
+    parser.add_argument('--debug', action='store_true', help='Print out debugging messages')
     args = parser.parse_args()
 
     #1) Declare a webExplorer instance
     myWebExplorer = web_explorer.webExplorer()
 
-    # 2) Change the working directory
-    if args.working_directory not None:
-        myWebExplorer.set_main_directory(working_directory)
-    else :
-        myWebExplorer.set_main_directory(os.getcwd())
+    # 2) Change the working directory if specified
+    if args.working_directory is not None:
+        myWebExplorer.set_main_directory(args.working_directory)
+
     print "Working directory: "+ myWebExplorer.main_directory
 
     # 3) Add url as start point
@@ -59,6 +60,10 @@ if __name__ == '__main__':
     if args.depth_level is not None :
         print "Exploration depth: " +  str(args.depth_level)
         myWebExplorer.set_exploring_depth(args.depth_level)
+
+    #Set the verbose and debugging modes
+    myWebExplorer.set_verbose(args.verbose)
+    myWebExplorer.set_debug(args.debug)
 
     # Explore the web pages :
     myWebExplorer.explore()
