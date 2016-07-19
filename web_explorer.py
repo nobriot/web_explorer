@@ -48,13 +48,13 @@ class webExplorer:
     def __init__(self, main_directory="", redirect_count=None, degree_depth_level=None, verbose = False):
         """ Class constructor, initialize instance variables """
         #This is the working directory, initialized with the argument given to the constructor
-        self.set_main_directory(self, main_directory)
+        self.set_main_directory(main_directory)
 
         # A list of websites we do not want to visit at all.
         self.url_blacklist= ".*google\..*|.*facebook\..*|.*instagram\..*|.*youtube\..*|.*twitter\..*|.*linkedin\..*|.*youtu\.be.*|.*goo\.gl.*|.*flickr\..*|.*bing\..*|.*itunes\..*|.*dropbox\..*" #All the websites we want to ignore
 
         #LIst of extension, that if we find in a URL, the URL will be discarded
-        self.extensions_to_ignore = ['\.pdf.*|pdf$','\.xls.*|xls$','\.doc.*$','\.asp.*|asp$','\.aspx.*|aspx$','\.ashx.*|ashx$','\.png.*|png$','\.jpg.*|jpg$','\.jpeg.*|jpeg$','\.flv.*|flv$','\.mp4.*|mp4$','\.mov.*|mov$']
+        self.extensions_to_ignore = ['.*\.pdf.*|^.*pdf$','^.*\.xls$','^.*\.doc$','.*\.asp.*|^.*asp$','.*\.aspx.*|^.*aspx$','.*\.ashx.*|^.*ashx$','.*\.png.*|^.*png$','.*\.jpe?g.*|^.*jpe?g$','.*\.flv.*|^.*flv$','.*\.mp4.*|^.*mp4$','.*\.mov.*|^.*mov$']
 
         # Set the exploration variables
         self.set_redirect_count(redirect_count)
@@ -144,19 +144,19 @@ class webExplorer:
                 #Prepare the variable that we add into the future URL to visit
                 external_base_urls = set()
 
-                # == The base URL has already been visited
-                if os.path.isdir(self.main_directory+"web_content/"+webpage):
-                    if not re.match("^[\.]+$",webpage): ## TODO : This is ugly, should be removed if possible (added it because some of the external_urls.p contain . as a base URL and is not filtered when loaded again)
+                # == The base URL has already been visited and we know the external URLs for this redirect count
+                if os.path.isfile(self.main_directory+"web_content/"+webpage+"/external_urls_"+self.redirect_count+"_redirect.p"):
+                    if not re.match("^[\.]+$",webpage): ## TODO : This is ugly, should be removed if possible (added it because some of the external_urls(redirect_count).p contain . as a base URL and is not filtered when loaded again)
                         if self.verbose:  #Anouncement message                     
                             print webpage + " has already been visited, loading external URLs..."
-                        filename = self.main_directory+"web_content/"+webpage+"/external_urls.p"
+                        filename = self.main_directory+"web_content/"+webpage+"/external_urls_"+self.redirect_count+"_redirect.p"
                         external_base_urls=pickle.load(open(filename, "rb" ))
 
                 # == The base URL has not been visited yet
                 else:
                     # 1) Create a folder for the website in the content folder. Create sub-folders "cleartext" and "linklist"
                     if self.verbose:  #Anouncement message 
-                        print "Creating folders for " + webpage
+                        print "Preparing folders for " + webpage
                     self.create_folder(self.main_directory+"web_content/"+webpage)
                     self.create_folder(self.main_directory+"web_content/"+webpage+"/cleartext")
                     self.create_folder(self.main_directory+"web_content/"+webpage+"/linklist")
@@ -179,7 +179,7 @@ class webExplorer:
                             external_base_urls= external_base_urls.union(self.find_external_base_urls(webpage,all_links))
 
                     # When done for the website, we save the external base URLs
-                    filename = self.main_directory+"web_content/"+webpage+"/external_urls.p"
+                    filename = self.main_directory+"web_content/"+webpage+"/external_urls_"+self.redirect_count+"_redirect.p"
                     pickle.dump(external_base_urls,open(filename, "wb" ))
 
                 # Add all the new found websites to the list of website to visit at the next "Web level"
@@ -260,8 +260,8 @@ class webExplorer:
     def create_dummy_files(self, base_url, internal_page):
         ''' Create empty files in the web content, so that broken URL are not tried several times '''
         if self.verbose:  #Anouncement message         
-            print "- WARNING : Could not open the following website : " + base_url
-            print "-> Creating dummy placeholder files for this site"
+            print "- WARNING : Could not open the following webpage : " + base_url + "/" + internal_page
+            print "-> Creating dummy placeholder files for this page"
         filename = self.main_directory+"web_content/"+base_url+"/cleartext/"+re.sub("/", '_', internal_page)+".txt"
         pagefile = open(filename,'w+')
         pagefile.close()
@@ -595,43 +595,41 @@ class webExplorer:
             print 'The corpus will not be created. Exiting...'
             return
 
-        #We make the process for each Base URL :
-        for base_url in url_tree.keys():
-            should_take_url = True
-            #if CVR_registry[base_url] == '30060946' or 'dtu' in base_url:
-            #if 'dtu' in base_url:
-            #     should_take_url = False
-
-            if should_take_url:
-                print "Base URL is : "+base_url
-                #First we create a master text in which we will add all the content for the website
-                base_url_total_content = ""
-
-                # Then find all the urls belonging to the site :
-                for filename in glob.glob(self.main_directory+"web_content/cleartext/"+re.sub("/", '_', base_url)+"*"):
-                    #First open the page :
-                    file_object = open(filename,'r')
-                    page_content = file_object.read()
-                    file_object.close()
-
-                    #We check the language
-                    if self.find_language(page_content) == language:
-                        #We add the content to the total content (with a space between in case)
-                        base_url_total_content = base_url_total_content +" "+ page_content
-
-                #When we saw all the pages, we save the text file for the base URL.
-                base_url = base_url.replace('http://www.','')
-                base_url = base_url.replace('https://www.','')
-                base_url = base_url.replace('http://','')
-                base_url = base_url.replace('https://','')
-                base_url_filename = self.main_directory+"web_content/corpus/"+language+"/"+re.sub("/", '', base_url)+".txt"
-
-                # We save the cleartext file (only if it is not already there)
-                if not os.path.isfile(base_url_filename) and base_url_total_content != "":
-                    base_url_total_content = self.clean_up_double_line_returns_and_spaces(base_url_total_content)
-                    base_url_file = open(base_url_filename,'w')
-                    base_url_file.write(base_url_total_content)
-                    base_url_file.close()
+        #We make the process for each Base URL of each level of our explorer :
+        for i in range(self.degree_depth_level):
+            for base_url in self.to_visit_urls[i]:
+                should_take_url = True
+                #if CVR_registry[base_url] == '30060946' or 'dtu' in base_url:
+                #if 'dtu' in base_url:
+                #     should_take_url = False
+    
+                if should_take_url:
+                    if self.verbose:
+                        print "Adding "+base_url+" to the R corpus"
+                    #First we create a master text in which we will add all the content for the website
+                    base_url_total_content = ""
+    
+                    # Then find all the urls belonging to the site :
+                    for filename in glob.glob(self.main_directory+"web_content/"+base_url+"/cleartext/*.txt"):
+                        #First open the page :
+                        file_object = open(filename,'r')
+                        page_content = file_object.read()
+                        file_object.close()
+    
+                        #We check the language
+                        if self.find_language(page_content) == language:
+                            #We add the content to the total content (with a space between in case)
+                            base_url_total_content = base_url_total_content +" "+ page_content
+    
+                    #When we saw all the pages, we save the text file for the base URL.
+                    base_url_filename = self.main_directory+"web_content/"+base_url+"/corpus/"+language+".txt"
+    
+                    # We save the cleartext file (only if it is not already there)
+                    if not os.path.isfile(base_url_filename) and base_url_total_content != "":
+                        base_url_total_content = self.clean_up_double_line_returns_and_spaces(base_url_total_content)
+                        base_url_file = open(base_url_filename,'w')
+                        base_url_file.write(base_url_total_content)
+                        base_url_file.close()
         #I guess that's it.
 
     def clean_up_double_line_returns_and_spaces(self,text):
@@ -664,6 +662,8 @@ class webExplorer:
         ''' Simple function taking a folder name and create it into the current working directory.'''
         try:
             if not os.path.exists(folder_name):
+                if self.debug:  #Print out that we create a folder
+                    print " - Creating folder : " + folder_name
                 os.makedirs(folder_name)
         except:
             print "ERROR : Could not create folder '"+folder_name+"'. Expect the script to experience problems."
