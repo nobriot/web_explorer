@@ -54,7 +54,7 @@ class webExplorer:
         self.url_blacklist= ".*google\..*|.*facebook\..*|.*instagram\..*|.*youtube\..*|.*twitter\..*|.*linkedin\..*|.*youtu\.be.*|.*goo\.gl.*|.*flickr\..*|.*bing\..*|.*itunes\..*|.*dropbox\..*" #All the websites we want to ignore
 
         #LIst of extension, that if we find in a URL, the URL will be discarded
-        self.extensions_to_ignore = ['.*\.pdf.*|^.*pdf$','^.*\.xls$','^.*\.doc$','.*\.asp.*|^.*asp$','.*\.aspx.*|^.*aspx$','.*\.ashx.*|^.*ashx$','.*\.png.*|^.*png$','.*\.jpe?g.*|^.*jpe?g$','.*\.flv.*|^.*flv$','.*\.mp4.*|^.*mp4$','.*\.mov.*|^.*mov$']
+        self.extensions_to_ignore = ['.*\.[pP][dD][fF].*|^.*[Pp][Dd][fF]$','^.*\.[Xx][lL][sS]$','^.*\.[Dd][oO][cC]$','.*\.[aA][sS][pP][xX]?.*|^.*[aA][sS][pP][xX]?$','.*\.ashx.*|^.*ashx$','.*\.[pP][nN][gG].*|^.*[pP][nN][gG]$','.*\.[jJ][Pp][eE]?[gG].*|^.*[jJ][Pp][eE]?[gG]$','.*\.flv.*|^.*flv$','.*\.mp4.*|^.*mp4$','.*\.mov.*|^.*mov$']
 
         # Set the exploration variables
         self.set_redirect_count(redirect_count)
@@ -145,11 +145,11 @@ class webExplorer:
                 external_base_urls = set()
 
                 # == The base URL has already been visited and we know the external URLs for this redirect count
-                if os.path.isfile(self.main_directory+"web_content/"+webpage+"/external_urls_"+self.redirect_count+"_redirect.p"):
+                if os.path.isfile(self.main_directory+"web_content/"+webpage+"/external_urls_"+str(self.redirect_count)+"_redirect.p"):
                     if not re.match("^[\.]+$",webpage): ## TODO : This is ugly, should be removed if possible (added it because some of the external_urls(redirect_count).p contain . as a base URL and is not filtered when loaded again)
                         if self.verbose:  #Anouncement message                     
                             print webpage + " has already been visited, loading external URLs..."
-                        filename = self.main_directory+"web_content/"+webpage+"/external_urls_"+self.redirect_count+"_redirect.p"
+                        filename = self.main_directory+"web_content/"+webpage+"/external_urls_"+str(self.redirect_count)+"_redirect.p"
                         external_base_urls=pickle.load(open(filename, "rb" ))
 
                 # == The base URL has not been visited yet
@@ -179,7 +179,7 @@ class webExplorer:
                             external_base_urls= external_base_urls.union(self.find_external_base_urls(webpage,all_links))
 
                     # When done for the website, we save the external base URLs
-                    filename = self.main_directory+"web_content/"+webpage+"/external_urls_"+self.redirect_count+"_redirect.p"
+                    filename = self.main_directory+"web_content/"+webpage+"/external_urls_"+str(self.redirect_count)+"_redirect.p"
                     pickle.dump(external_base_urls,open(filename, "wb" ))
 
                 # Add all the new found websites to the list of website to visit at the next "Web level"
@@ -585,8 +585,8 @@ class webExplorer:
 
     def create_R_corpus(self,language):
         ''' Create a corpus of files for R from the working directory.
-        - language parameter has to a supported language by find_language(). Currently it is
-        either "Danish" or "English"
+        - language parameter has to a supported language by returned by the find_language() function. 
+        Currently it is either "Danish" or "English"
         The corpus is placed in the corpus/ folder, followed by the language'''
 
         #Check whether the language is supported :
@@ -595,42 +595,58 @@ class webExplorer:
             print 'The corpus will not be created. Exiting...'
             return
 
-        #We make the process for each Base URL of each level of our explorer :
-        for i in range(self.degree_depth_level):
-            for base_url in self.to_visit_urls[i]:
+        #For each website, the corpus file corresponding will be a concatenation of all the content
+        for base_url in os.listdir(self.main_directory+"web_content/"):
+            # Now small test to see whether the website should be part of the corpus or not
+            should_take_url = False
+        
+            # Could do another kind of test
+            if self.is_danish_company(base_url):
                 should_take_url = True
-                #if CVR_registry[base_url] == '30060946' or 'dtu' in base_url:
-                #if 'dtu' in base_url:
-                #     should_take_url = False
+
+            if should_take_url:
+                if self.verbose:
+                    print "Adding "+base_url+" to the R corpus"
+                #First we create a master text in which we will add all the content for the website
+                base_url_total_content = ""
     
-                if should_take_url:
-                    if self.verbose:
-                        print "Adding "+base_url+" to the R corpus"
-                    #First we create a master text in which we will add all the content for the website
-                    base_url_total_content = ""
+                # Then find all the urls belonging to the site :
+                for filename in glob.glob(self.main_directory+"web_content/"+base_url+"/cleartext/*.txt"):
+                    #First open the page :
+                    file_object = open(filename,'r')
+                    page_content = file_object.read()
+                    file_object.close()
     
-                    # Then find all the urls belonging to the site :
-                    for filename in glob.glob(self.main_directory+"web_content/"+base_url+"/cleartext/*.txt"):
-                        #First open the page :
-                        file_object = open(filename,'r')
-                        page_content = file_object.read()
-                        file_object.close()
+                    #We check the language for that very page (a website can have several languages)
+                    if self.find_language(page_content) == language:
+                        #We add the content to the total content (with a space between in case)
+                        base_url_total_content = base_url_total_content +" "+ page_content
     
-                        #We check the language
-                        if self.find_language(page_content) == language:
-                            #We add the content to the total content (with a space between in case)
-                            base_url_total_content = base_url_total_content +" "+ page_content
+                #When we saw all the pages, we save the text file for the base URL.
+                base_url_filename = self.main_directory+"/corpus/"+language+"/"+base_url+".txt"
     
-                    #When we saw all the pages, we save the text file for the base URL.
-                    base_url_filename = self.main_directory+"web_content/"+base_url+"/corpus/"+language+".txt"
-    
-                    # We save the cleartext file (only if it is not already there)
-                    if not os.path.isfile(base_url_filename) and base_url_total_content != "":
-                        base_url_total_content = self.clean_up_double_line_returns_and_spaces(base_url_total_content)
-                        base_url_file = open(base_url_filename,'w')
-                        base_url_file.write(base_url_total_content)
-                        base_url_file.close()
+                # We save the cleartext file (only if it is not already there)
+                if not os.path.isfile(base_url_filename) and base_url_total_content != "":
+                    base_url_total_content = self.clean_up_double_line_returns_and_spaces(base_url_total_content)
+                    base_url_file = open(base_url_filename,'w')
+                    base_url_file.write(base_url_total_content)
+                    base_url_file.close()
         #I guess that's it.
+                    
+    def reset_R_corpus(self,language) :
+        ''' Functiont that resets the R corpus by erasing the files for a clean
+        re-creation of the corpus '''
+        
+        #Check whether the language is supported :
+        if language not in ['English','Danish']:
+            print 'ERROR : Input language is incorrect : ' + language
+            print 'The corpus will not be created. Exiting...'
+            return
+        
+        folder = self.main_directory+"corpus/"+language+"/"
+        for filename in os.listdir(folder):
+             os.remove(folder+ filename)
+            
 
     def clean_up_double_line_returns_and_spaces(self,text):
         ''' Quick function for rough cleanup of the double tabs, spaces and line
@@ -670,45 +686,119 @@ class webExplorer:
             
     
     
-    def find_CVR_number(self, files_path):
+    def find_CVR_numbers(self):
         ''' Function scanning the content of text files (with .txt extension) 
         in a folder and finds out whether it contains a CVR number.
+        When found, it saves a cvr.p variable in the website folder
         Returns : 
         - None if nothing found, 
         - ApS if no CVR is found but ApS is present in the site
         - A string with the CVR number if CVR is found'''
-        #We declare our variables.
-        found_CVR = None
-        html_filename_mask = files_path+"/*.txt"
 
-        #We repeat for each file starting with the base URL.
-        for filename in glob.glob(html_filename_mask):#Load the file cleartext content
-            html_page_file = open(filename,'r')
-            html_page_cleartext = html_page_file.read()
-            html_page_file.close()
-
-            #We first find out what's the base_url (website url)
-            CVR_regex_result = re.findall("((CVR|VAT)\D{0,12}(\d{2}\D{0,2}\d{2}\D{0,2}\d{2}\D{0,2}\d{2})(\D{0,2}\d{2}\D{0,2}\d{2})?)",html_page_cleartext)
+        #We try to find CVR for each scanned website : 
+        for base_url in os.listdir(self.main_directory+"web_content/"):
+            # Variable which remembers when we find the CVR number
+            found_CVR = False
+            # If CVR has been previously found, we have saved it in the file            
+            if os.path.isfile(self.main_directory+"web_content/"+base_url+"/cvr.p"):
+                found_CVR = True
             
-            if CVR_regex_result:
-                #First results matches the whole stuff, 2nd matches the letters and 3rd matches the numbers
-                # Example : CVR_regex_result = [('CVR number 05 5048 54','CVR','05 5048 54')]
-                found_CVR = CVR_regex_result[0][2]
+            #Mask for the files that will be investigated 
+            html_filename_mask = self.main_directory+"web_content/"+base_url+"/cleartext/*.txt"
+            
+            if not found_CVR : #CVR has never been found :             
+                for filename in glob.glob(html_filename_mask):
+                    #Load the file cleartext content
+                    html_page_file = open(filename,'r')
+                    html_page_cleartext = html_page_file.read()
+                    html_page_file.close()
+
+                    #We first find out what's the base_url (website url)
+                    CVR_regex_result = re.findall("((CVR|VAT)\D{0,12}(\d{2}\D{0,2}\d{2}\D{0,2}\d{2}\D{0,2}\d{2})(\D{0,2}\d{2}\D{0,2}\d{2})?)",html_page_cleartext)
+            
+                    if CVR_regex_result:
+                        #First results matches the whole stuff, 2nd matches the letters and 3rd matches the numbers
+                        # Example : CVR_regex_result = [('CVR number 05 5048 54','CVR','05 5048 54')]
+                        found_CVR_text = CVR_regex_result[0][2]
+                        found_CVR = True
+                        if self.verbose:  #Anouncement message 
+                            print "Found CVR number : " + found_CVR_text + " for " + base_url
+                        
+                        #Save the cvr.p file containing the CVR number
+                        filename= self.main_directory+"web_content/"+base_url+"/cvr.p"
+                        pickle.dump(found_CVR_text,open(filename, "wb" ))
+                        
+                        break #Exit the for loop, no need to browse more of the base website pages.
+
+            if not found_CVR :  #Did not find CVR, but maybe we have a chance with ApS or A/S
+                for filename in glob.glob(html_filename_mask):#Load the file cleartext content
+                    #Load the file cleartext content
+                    html_page_file = open(filename,'r')
+                    html_page_cleartext = html_page_file.read()
+                    html_page_file.close()#Did not find CVR, but maybe we have a chance with ApS or A/S
+                    
+                    APS_regex_result = re.findall("(ApS|A/S)",html_page_cleartext)
+                    
+                    if APS_regex_result:
+                        found_CVR = True
+                        if self.verbose:  #Anouncement message                         
+                            print "Found 'ApS' for website : " + base_url
+                            
+                        #create an empty aps.p file
+                        open(self.main_directory+"web_content/"+base_url+"/aps.p", 'a').close()
+                        break #Exit the for loop, no need to browse more of the base website pages.
+
+        if self.verbose:  #Anouncement message 
+            print "Finished finding CVR number for all websites "
+        
+    def has_cvr_number(self, base_url):
+        '''Function that returns True is a CVR number has been found in the 
+        website scan
+        '''
+        if os.path.isfile(self.main_directory+"web_content/"+base_url+"/cvr.p"):
+            return True
+        else:
+            return False
+            
+    def is_danish_company(self, base_url):
+        '''Function that returns True is a ApS or A/S or a CVR number has been 
+        found on the website scan
+        '''
+        if os.path.isfile(self.main_directory+"web_content/"+base_url+"/cvr.p"):
+            return True
+        elif os.path.isfile(self.main_directory+"web_content/"+base_url+"/aps.p"):
+            return True
+        else:
+            return False
+            
+    def get_CVR_number(self,base_url) :
+        '''Return the CVR number of a company, else returns None'''
+        if self.has_cvr_number(base_url) : 
+            return pickle.load(open(self.main_directory+"web_content/"+base_url+"/cvr.p", "rb"))
+        else :
+            return None
+            
+    def clear_all_CVR_numbers(self) :
+        ''' Function going around and erasing the files containing the CVR data
+        in order to do a fresh re-discovery'''
+        for base_url in os.listdir(self.main_directory+"web_content/"):
+            # If CVR or ApS has been previously found, remove it for a fresh start
+            if os.path.isfile(self.main_directory+"web_content/"+base_url+"/cvr.p"):
                 if self.verbose:  #Anouncement message 
-                    print "Found CVR number : " + found_CVR + " for " + files_path
-                break #Exit the for loop, no need to browse more of the base website pages.
-
-        if not found_CVR :  #Did not find CVR, but maybe we have a chance with ApS or A/S
-            for filename in glob.glob(html_filename_mask):#Load the file cleartext content
-                html_page_file = open(filename,'r')
-                html_page_cleartext = html_page_file.read()
-                html_page_file.close()#Did not find CVR, but maybe we have a chance with ApS or A/S
-                APS_regex_result = re.findall("(ApS|A/S)",html_page_cleartext)
-                if APS_regex_result:
-                    found_CVR = "ApS"
-                    if self.verbose:  #Anouncement message                         
-                        print "Found ApS for website : " + files_path
-                    break
-
-        #Return the found CVR number.
-        return found_CVR
+                    print "Removing CVR number for " + base_url + "..."
+                os.remove(self.main_directory+"web_content/"+base_url+"/cvr.p")
+            if os.path.isfile(self.main_directory+"web_content/"+base_url+"/aps.p"):
+                if self.verbose:  #Anouncement message 
+                    print "Removing ApS mark for " + base_url + "..."
+                os.remove(self.main_directory+"web_content/"+base_url+"/aps.p")
+                
+    def list_danish_companies(self):
+        ''' Function that returns a list object of danish companies '''
+        danish_companies = []
+        
+        for base_url in os.listdir(self.main_directory+"web_content/"):
+            if self.is_danish_company(base_url):
+                danish_companies.append(base_url)
+        
+        return danish_companies
+        

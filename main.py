@@ -38,21 +38,27 @@ if __name__ == '__main__':
     print "1) Adding startpoint URLs : " + DTU_url
     myWebExplorer.set_explore_start_points(DTU_url)
 
-    #myWebExplorer.set_redirect_count(3)
-    #myWebExplorer.set_exploring_depth(3)
+    #Exploring configuration
+    myWebExplorer.set_redirect_count(3)
+    myWebExplorer.set_exploring_depth(3)
+
+    # Verbose/debug configuration : 
+    myWebExplorer.set_verbose(True)
+    myWebExplorer.set_debug(True)
 
     # 3) Continue to explore the webpages until we reached degree_depth_level
-    print "2) Exploring web links: this will take VERY long (weeks)"
-    myWebExplorer.explore()
+    #print "2) Exploring web links: this will take VERY long (weeks)"
+    #myWebExplorer.explore()
+
+    # 4) Find the CVR numbers we can from the corpuses.
+    print "4) Look up the CVR numbers"
+    myWebExplorer.clear_all_CVR_numbers()
+    myWebExplorer.find_CVR_numbers()
 
     # 5) Create a R corpus for a certain language - Stored in "main_directory"/web_content/corpus/"Language"
-    if 0 :
-        print "4) Creating a corpus"
-        #create_R_corpus("English") #Remember to erase the previous corpus if you want to update the existing pages
-        #create_R_corpus("Danish")
-
-    # 6) Find the CVR numbers we can from the corpuses.
-    # It is advised to have a Danish corpus for finding CVR numbers, as they usually are not mentionned in English.
-    if 0:
-        print "5) Look up the CVR numbers"
-        #update_CVR_registry()
+    print "5) Creating a corpus"
+    myWebExplorer.create_R_corpus("English") #Remember to erase the previous corpus if you want to update the existing pages
+    myWebExplorer.create_R_corpus("Danish")
+    
+    # 6) Play with the resust : 
+    myWebExplorer.list_danish_companies()
