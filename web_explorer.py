@@ -607,30 +607,28 @@ class webExplorer:
             if should_take_url:
                 if self.verbose:
                     print "Adding "+base_url+" to the R corpus"
-                #First we create a master text in which we will add all the content for the website
-                base_url_total_content = ""
-    
-                # Then find all the urls belonging to the site :
-                for filename in glob.glob(self.main_directory+"web_content/"+base_url+"/cleartext/*.txt"):
-                    #First open the page :
-                    file_object = open(filename,'r')
-                    page_content = file_object.read()
-                    file_object.close()
-    
-                    #We check the language for that very page (a website can have several languages)
-                    if self.find_language(page_content) == language:
-                        #We add the content to the total content (with a space between in case)
-                        base_url_total_content = base_url_total_content +" "+ page_content
-    
-                #When we saw all the pages, we save the text file for the base URL.
+                
+                # Prepare the destination file
                 base_url_filename = self.main_directory+"/corpus/"+language+"/"+base_url+".txt"
     
                 # We save the cleartext file (only if it is not already there)
-                if not os.path.isfile(base_url_filename) and base_url_total_content != "":
-                    base_url_total_content = self.clean_up_double_line_returns_and_spaces(base_url_total_content)
-                    base_url_file = open(base_url_filename,'w')
-                    base_url_file.write(base_url_total_content)
-                    base_url_file.close()
+                if not os.path.isfile(base_url_filename):
+                    # Then find all the urls belonging to the site :
+                    for filename in glob.glob(self.main_directory+"web_content/"+base_url+"/cleartext/*.txt"):
+                        #First open the page :
+                        page_content="" #Re-init the page content
+                        file_object = open(filename,'r')
+                        page_content = file_object.read()
+                        file_object.close()
+        
+                        #We check the language for that very page (a website can have several languages)
+                        if self.find_language(page_content) == language:
+                            #We add the content to the total content (with a space between in case)
+                            page_content = self.clean_up_double_line_returns_and_spaces(page_content)
+                            base_url_file = open(base_url_filename,'a')
+                            base_url_file.write(page_content)
+                            base_url_file.close()
+                
         #I guess that's it.
                     
     def reset_R_corpus(self,language) :
