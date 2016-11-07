@@ -44,7 +44,7 @@ if __name__ == '__main__':
 
     # Verbose/debug configuration : 
     myWebExplorer.set_verbose(True)
-    myWebExplorer.set_debug(True)
+    #myWebExplorer.set_debug(True)
 
     # 3) Continue to explore the webpages until we reached degree_depth_level
     #print "2) Exploring web links: this will take VERY long (weeks)"
@@ -57,9 +57,12 @@ if __name__ == '__main__':
 
     # 5) Create a R corpus for a certain language - Stored in "main_directory"/web_content/corpus/"Language"
     print "5) Creating a corpus"
-    #myWebExplorer.reset_R_corpus("English")    
-    #myWebExplorer.create_R_corpus("English") #Remember to erase the previous corpus if you want to update the existing pages
-    myWebExplorer.create_R_corpus("Danish")
+    myWebExplorer.reset_R_corpus("English")    
+    myWebExplorer.create_R_corpuses("English") #Remember to erase the previous corpus if you want to update the existing pages
+    #myWebExplorer.create_R_corpus("Danish")
     
     # 6) Play with the resust : 
     myWebExplorer.list_danish_companies()
+    
+    #7) Create a network graph
+    myWebExplorer.create_web_network_graph()

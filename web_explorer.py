@@ -31,6 +31,9 @@ import re
 from bs4 import BeautifulSoup
 import pickle
 
+import networkx as nx
+import matplotlib.pyplot as plt #For plotting graphs
+
 # Class definition : webExplorer
 class webExplorer:
     """ webExplorer Class. 
@@ -54,7 +57,7 @@ class webExplorer:
         self.url_blacklist= ".*google\..*|.*facebook\..*|.*instagram\..*|.*youtube\..*|.*twitter\..*|.*linkedin\..*|.*youtu\.be.*|.*goo\.gl.*|.*flickr\..*|.*bing\..*|.*itunes\..*|.*dropbox\..*" #All the websites we want to ignore
 
         #LIst of extension, that if we find in a URL, the URL will be discarded
-        self.extensions_to_ignore = ['.*\.[pP][dD][fF].*|^.*[Pp][Dd][fF]$','^.*\.[Xx][lL][sS]$','^.*\.[Dd][oO][cC]$','.*\.[aA][sS][pP][xX]?.*|^.*[aA][sS][pP][xX]?$','.*\.ashx.*|^.*ashx$','.*\.[pP][nN][gG].*|^.*[pP][nN][gG]$','.*\.[jJ][Pp][eE]?[gG].*|^.*[jJ][Pp][eE]?[gG]$','.*\.flv.*|^.*flv$','.*\.mp4.*|^.*mp4$','.*\.mov.*|^.*mov$']
+        self.extensions_to_ignore = ['.*\.[pP][dD][fF].*|^.*[Pp][Dd][fF]$','^.*\.[Xx][lL][sS]$','^.*\.[Dd][oO][cC][mMxX]?$','.*\.[aA][sS][pP][xX]?.*|^.*[aA][sS][pP][xX]?$','.*\.ashx.*|^.*ashx$','.*\.[pP][nN][gG].*|^.*[pP][nN][gG]$','.*\.[jJ][Pp][eE]?[gG].*|^.*[jJ][Pp][eE]?[gG]$','.*\.flv.*|^.*flv$','.*\.mp4.*|^.*mp4$','.*\.mov.*|^.*mov$']
 
         # Set the exploration variables
         self.set_redirect_count(redirect_count)
@@ -404,7 +407,7 @@ class webExplorer:
                     keep_link = False
             #No poisonous extension found, so we proceed.
             if keep_link:
-                if "javascript:" in link or "mailto:" in link:
+                if "javascript:" in link or "mailto:" in link or "ftp:" in link or "file:" in link:
                     keep_link = False
                 elif re.match("^[\.]+$",link): #If it is points only, throw it away
                     keep_link = False
@@ -615,19 +618,87 @@ class webExplorer:
                 if not os.path.isfile(base_url_filename):
                     # Then find all the urls belonging to the site :
                     for filename in glob.glob(self.main_directory+"web_content/"+base_url+"/cleartext/*.txt"):
-                        #First open the page :
-                        page_content="" #Re-init the page content
-                        file_object = open(filename,'r')
-                        page_content = file_object.read()
-                        file_object.close()
+                        #Remove the file if it is a JPEG or PDF or whatever else                        
+                        keep_file=True
+                        for extension in self.extensions_to_ignore:
+                            if re.match(extension,filename):
+                                keep_file = False
+                                
+                        if keep_file:
+                            #First open the page :
+                            page_content="" #Re-init the page content
+                            file_object = open(filename,'r')
+                            page_content = file_object.read()
+                            file_object.close()
+            
+                            #We check the language for that very page (a website can have several languages)
+                            if self.find_language(page_content) == language:
+                                #if self.debug:
+                                #    print "Adding "+filename+" to the corpus"
+                                #We add the content to the total content (with a space between in case)
+                                page_content = self.clean_up_double_line_returns_and_spaces(page_content)
+                                base_url_file = open(base_url_filename,'a')
+                                base_url_file.write(page_content)
+                                base_url_file.close()
+                
+        #I guess that's it.
+                
+                
+    def create_R_corpuses(self,language):
+        ''' Create a corpus of files for R from the working directory.
+        - Each site is a folder with its own corpora 
+        Language :  Currently it is either "Danish" or "English"
+        The corpuses are placed in the corpus/ folder, followed by the language'''
+
+        #Check whether the language is supported :
+        if language not in ['English','Danish']:
+            print 'ERROR : Input language is incorrect : ' + language
+            print 'The corpus will not be created. Exiting...'
+            return
+
+        #For each website, the corpus file corresponding will be a concatenation of all the content
+        for base_url in os.listdir(self.main_directory+"web_content/"):
+            # Now small test to see whether the website should be part of the corpus or not
+            should_take_url = False
         
-                        #We check the language for that very page (a website can have several languages)
-                        if self.find_language(page_content) == language:
-                            #We add the content to the total content (with a space between in case)
-                            page_content = self.clean_up_double_line_returns_and_spaces(page_content)
-                            base_url_file = open(base_url_filename,'a')
-                            base_url_file.write(page_content)
-                            base_url_file.close()
+            # Could do another kind of test
+            if self.is_danish_company(base_url):
+                should_take_url = True
+
+            if should_take_url:
+                if self.verbose:
+                    print "Adding "+base_url+" to the R corpus"
+                
+                # Prepare the destination file
+                base_url_foldername = self.main_directory+"/corpus/"+language+"/"+base_url
+    
+                # We do it only if it is not already here
+                if not os.path.exists(base_url_foldername):
+                    #First create the folder for the website : 
+                    self.create_folder(base_url_foldername)
+                    # Then find all the urls belonging to the site :
+                    for filename in glob.glob(self.main_directory+"web_content/"+base_url+"/cleartext/*.txt"):
+                        #Remove the file if it is a JPEG or PDF or whatever else                        
+                        keep_file=True
+                        for extension in self.extensions_to_ignore:
+                            if re.match(extension,filename):
+                                keep_file = False
+                                
+                        if keep_file:
+                            #First open the page :
+                            page_content="" #Re-init the page content
+                            file_object = open(filename,'r')
+                            page_content = file_object.read()
+                            file_object.close()
+            
+                            #We check the language for that very page (a website can have several languages)
+                            if self.find_language(page_content) == language:
+                                #We add the content to the total content (with a space between in case)
+                                page_content = self.clean_up_double_line_returns_and_spaces(page_content)
+                                destination_filename = filename.split("/")[-1]
+                                base_url_file = open(base_url_foldername+"/"+destination_filename,'w')
+                                base_url_file.write(page_content)
+                                base_url_file.close()
                 
         #I guess that's it.
                     
@@ -659,17 +730,20 @@ class webExplorer:
             text = re.sub("\xc2\xa0", ' ', text)
         while '  ' in text:
             text = re.sub("  ", ' ', text)
+            
+#         #Now we tokenize the text in order to clean it up:
+#        word_list = text.split()
+#        filtered_text = ""
+#        for word in word_list:
+#            # isalpha() returns true if it is neither punctuation nor a number, so just words
+#            if(word.isalpha()==True):
+#                # In case it is an actual word, we keep it and store it to lowercase.
+#                filtered_text = filtered_text + word.lower() + " "
+#
+#        return filtered_text
 
-        #Now we tokenize the text in order to clean it up:
-        word_list = text.split()
-        filtered_text = ""
-        for word in word_list:
-            # isalpha() returns true if it is neither punctuation nor a number, so just words
-            if(word.isalpha()==True):
-                # In case it is an actual word, we keep it and store it to lowercase.
-                filtered_text = filtered_text + word.lower() + " "
-
-        return filtered_text
+        return text
+       
 
 
     def create_folder(self,folder_name):
@@ -800,3 +874,38 @@ class webExplorer:
         
         return danish_companies
         
+    def create_web_network_graph(self):
+        ''' Functions that creates a NetworkX network visualization from the 
+        explored pages '''
+        #Create a directed graph
+        web_graph=nx.DiGraph()
+        # Add our start nodes first to the graph, as the center.
+        web_graph.add_nodes_from(self.to_visit_urls[0])
+        
+        #Now we explore our results to add the relevant websites to the graph
+        for base_url in os.listdir(self.main_directory+"web_content/"):
+            if self.is_danish_company(base_url): #Only Danish companies are added : 
+                web_graph.add_node(base_url)
+        
+        #Explore again to fill up all the edges (connections/links) between websites
+        for base_url in os.listdir(self.main_directory+"web_content/"):
+            if self.is_danish_company(base_url): # Same as before only Danish companies
+                #Load up the links from this Danish company to other websites
+                filename = self.main_directory+"web_content/"+base_url+"/external_urls_"+str(self.redirect_count)+"_redirect.p"
+                external_base_urls=pickle.load(open(filename, "rb" ))
+                
+                #Now we also filter the list of external links
+                for external_link in external_base_urls:
+                    if web_graph.has_node(external_link) : # The link is also in the graph, so the connection is added
+                        web_graph.add_edge(base_url,external_link)
+        
+        #Finally draw the network 
+        #plt.figure(figsize=(120, 90))
+        plt.figure(figsize=(40, 40))
+        pos = nx.random_layout(web_graph)
+        nx.draw_networkx_nodes(web_graph,pos,node_size=2500)
+        nx.draw_networkx_nodes(web_graph,nodelist=self.to_visit_urls[0],pos=pos,node_size=3000,node_color='b')
+        #nx.draw_networkx_labels(web_graph,pos,fontsize=12)
+        nx.draw_networkx_edges(web_graph,pos,alpha=0.5)
+        plt.savefig(self.main_directory+"DTU network.png",dpi=40)
+        plt.show()
