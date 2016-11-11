@@ -45,7 +45,7 @@ class webExplorer:
 
     #Variable shared by all instances of webExplorer class
     # This is used to extract the URL of a website in the links (e.g. extracts google.fr from https://www.google.fr/something?query=myquery)
-    base_url_regex = '^https?://.+?\..+?/|^https?://.+?\..+?\?|^https?://.+?\..+?#|^https?://.+?\..+|^.+?\..+?/|^.+?\..+?\?|^.+?\..+?#|^.+?\..+'
+    base_url_regex = '^https?://.+?\..+?/|^https?://.+?\..+?\?|^https?://.+?\..+?#|^https?://.+?\..+|^//.+?\..+?/|^//.+?\..+?\?|^//.+?\..+?#|^//.+?\..+'
 
     #Constructor : variable init when creating the object. Initializing variables
     def __init__(self, main_directory="", redirect_count=None, degree_depth_level=None, verbose = False):
@@ -316,10 +316,10 @@ class webExplorer:
         for link in all_links:
             #We first find out what's the base_url (website url)
             if len(link)>0 and len(link)<200: #We throw away links with more than 200 chars
-                if link[0] == "/" : # If it starts with a /, it is a relative path
+                if (link[0] == "/" and link[1] != "/") or (":" not in link): # If it starts with a / but is not //, it is a relative path
                     #Remove trailing "/"
-                    while link[0] == "/" :
-                        link = link[1:]
+                    link = link[1:]
+                    #Append to the current list
                     internal_links.append(link)
 
                 else: # It must be an absolute path, we need to pull out the base URL
@@ -334,6 +334,7 @@ class webExplorer:
                         found_base_url = found_base_url.replace('/','')
                         found_base_url = found_base_url.replace('?','')
                         found_base_url = found_base_url.replace('#','')
+                        found_base_url = found_base_url.replace('www.','')
 
                         if webpage == found_base_url :
                             relative_path = link.replace(webpage,'')
@@ -368,23 +369,23 @@ class webExplorer:
         for link in all_links:
             #We first find out what's the base_url (website url)
             if len(link)>0 and len(link)<200: #We throw away links with more than 200 chars
-                if link[0] != "/" : # If it starts with a /, it is a relative path, we do not want that
+                if not (link[0] == "/" and link[1] != "/") or (":" in link):  # If it starts with a /, it is a relative path, we do not want that
                     #Find what is the website for that link
                     found_base_url = re.match(self.base_url_regex, link)
                     if found_base_url:
                         found_base_url = found_base_url.group(0)
                         found_base_url = found_base_url.replace('https://','')
                         found_base_url = found_base_url.replace('http://','')
-                        #found_base_url = found_base_url.replace('www.','')
                         found_base_url = found_base_url.replace(':80','')
                         found_base_url = found_base_url.replace(':443','')
                         found_base_url = found_base_url.replace('/','')
-                        found_base_url = found_base_url.replace('?','')
-                        found_base_url = found_base_url.replace('#','')
+                        found_base_url = found_base_url.split('#')[0]
+                        found_base_url = found_base_url.split('?')[0]
                         found_base_url = found_base_url.replace('%20','')
+                        found_base_url = found_base_url.replace('www.','')
 
-                        while ".." in found_base_url:
-                            found_base_url = found_base_url.replace('..','.')
+                        #while ".." in found_base_url:
+                        #    found_base_url = found_base_url.replace('..','.')
 
                         #We add it to the list if it is a different webpage
                         if webpage != found_base_url and found_base_url is not None:
@@ -408,6 +409,8 @@ class webExplorer:
             #No poisonous extension found, so we proceed.
             if keep_link:
                 if "javascript:" in link or "mailto:" in link or "ftp:" in link or "file:" in link:
+                    keep_link = False
+                elif "127.0.0.1" in link: #This is not correct either
                     keep_link = False
                 elif re.match("^[\.]+$",link): #If it is points only, throw it away
                     keep_link = False
