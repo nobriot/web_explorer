@@ -5,7 +5,7 @@ websites it visits in order to analyze it afterwards.
 
 * TODO : Nice description
 
-This module allows to specify a list of URL to start from as a first level. It explores the content the starting website, following a certain amount of hyperlinks within the start website.
+This module allows to specify a list of URLs to start from as a first level. It explores the content the starting website, following a certain amount of hyperlinks within the start website (redirect_count) and subsequently visits the links to other websites found in the previous level.
 
 ### Installation
 No installation is required, simply run the program with Python :
