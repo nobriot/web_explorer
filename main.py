@@ -34,14 +34,18 @@ if __name__ == '__main__':
     myWebExplorer = web_explorer.webExplorer("/home/shared/Scripts/web_explorer/",3,3)
 
     # 2) Add DTU url as start point
-    DTU_url = "www.dtu.dk"
+    DTU_url = "dtu.dk"
     print "1) Adding startpoint URLs : " + DTU_url
     myWebExplorer.set_explore_start_points(DTU_url)
 
     #Exploring configuration
     myWebExplorer.set_redirect_count(3)
     myWebExplorer.set_exploring_depth(3)
-
+    
+    #Reset previous result : 
+    #myWebExplorer.clear_all_link_lists()
+    #myWebExplorer.remove_www_for_websites()
+    
     # Verbose/debug configuration : 
     myWebExplorer.set_verbose(True)
     #myWebExplorer.set_debug(True)
@@ -57,12 +61,12 @@ if __name__ == '__main__':
 
     # 5) Create a R corpus for a certain language - Stored in "main_directory"/web_content/corpus/"Language"
     print "5) Creating a corpus"
-    myWebExplorer.reset_R_corpus("English")    
-    myWebExplorer.create_R_corpuses("English") #Remember to erase the previous corpus if you want to update the existing pages
+    #myWebExplorer.reset_R_corpus("English")    
+    #myWebExplorer.create_R_corpuses("English") #Remember to erase the previous corpus if you want to update the existing pages
     #myWebExplorer.create_R_corpus("Danish")
     
     # 6) Play with the resust : 
-    myWebExplorer.list_danish_companies()
+    #myWebExplorer.list_danish_companies()
     
     #7) Create a network graph
-    myWebExplorer.create_web_network_graph()
+    #myWebExplorer.create_web_network_graph()

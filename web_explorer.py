@@ -26,6 +26,7 @@ Last modified : 10/07/2016 by Nicolas Obriot
 
 #%% First section, all the different imports.
 import os.path, glob, os
+import shutil #Remove directories with files
 import urllib2 as url
 import re
 from bs4 import BeautifulSoup
@@ -54,10 +55,10 @@ class webExplorer:
         self.set_main_directory(main_directory)
 
         # A list of websites we do not want to visit at all.
-        self.url_blacklist= ".*google\..*|.*facebook\..*|.*instagram\..*|.*youtube\..*|.*twitter\..*|.*linkedin\..*|.*youtu\.be.*|.*goo\.gl.*|.*flickr\..*|.*bing\..*|.*itunes\..*|.*dropbox\..*" #All the websites we want to ignore
+        self.url_blacklist= ".*google\..*|.*facebook\..*|.*instagram\..*|.*youtube\..*|.*twitter\..*|.*linkedin\..*|.*youtu\.be.*|.*goo\.gl.*|.*flickr\..*|.*bing\..*|.*itunes\..*|.*dropbox\..*|.*independent\.co.*" #All the websites we want to ignore
 
         #LIst of extension, that if we find in a URL, the URL will be discarded
-        self.extensions_to_ignore = ['.*\.[pP][dD][fF].*|^.*[Pp][Dd][fF]$','^.*\.[Xx][lL][sS]$','^.*\.[Dd][oO][cC][mMxX]?$','.*\.[aA][sS][pP][xX]?.*|^.*[aA][sS][pP][xX]?$','.*\.ashx.*|^.*ashx$','.*\.[pP][nN][gG].*|^.*[pP][nN][gG]$','.*\.[jJ][Pp][eE]?[gG].*|^.*[jJ][Pp][eE]?[gG]$','.*\.flv.*|^.*flv$','.*\.mp4.*|^.*mp4$','.*\.mov.*|^.*mov$']
+        self.extensions_to_ignore = ['.*\.[pP][dD][fF].*|^.*[Pp][Dd][fF]$','^.*\.[Xx][lL][sS]$','^.*\.[Dd][oO][cC][mMxX]?$','.*\.[aA][sS][pP][xX]?.*|^.*[aA][sS][pP][xX]?$','.*\.[aA][sS][hH][xX].*|^.*[aA][sS][hH][xX]$','.*\.[pP][nN][gG].*|^.*[pP][nN][gG]$','.*\.[jJ][Pp][eE]?[gG].*|^.*[jJ][Pp][eE]?[gG]$','.*\.flv.*|^.*flv$','.*\.mp4.*|^.*mp4$','.*\.mov.*|^.*mov$']
 
         # Set the exploration variables
         self.set_redirect_count(redirect_count)
@@ -314,6 +315,8 @@ class webExplorer:
 
         internal_links = []
         for link in all_links:
+            #Remove leading and trailing spaces
+            link = link.strip()
             #We first find out what's the base_url (website url)
             if len(link)>0 and len(link)<200: #We throw away links with more than 200 chars
                 if (link[0] == "/" and link[1] != "/") or (":" not in link): # If it starts with a / but is not //, it is a relative path
@@ -324,27 +327,14 @@ class webExplorer:
 
                 else: # It must be an absolute path, we need to pull out the base URL
                     #Find what is the website and add the link in the list IIF it is within the same website
-                    found_base_url = re.match(self.base_url_regex, link)
-                    if found_base_url:
-                        found_base_url = found_base_url.group(0)
-                        found_base_url = found_base_url.replace('https://','')
-                        found_base_url = found_base_url.replace('http://','')
-                        found_base_url = found_base_url.replace(':80','')
-                        found_base_url = found_base_url.replace(':443','')
-                        found_base_url = found_base_url.replace('/','')
-                        found_base_url = found_base_url.replace('?','')
-                        found_base_url = found_base_url.replace('#','')
-                        found_base_url = found_base_url.replace('www.','')
+                    found_base_url = self.extract_base_url(link)
 
-                        if webpage == found_base_url :
-                            relative_path = link.replace(webpage,'')
-                            relative_path = relative_path.replace('https://','')
-                            relative_path = relative_path.replace('http://','')
-                            relative_path = relative_path.replace(':80','')
-                            relative_path = relative_path.replace(':443','')
-                            relative_path = relative_path.split('#')[0]
-                            relative_path = relative_path.split('?')[0]
-                            internal_links.append(relative_path)
+                    if webpage == found_base_url :
+                        #Remove everything after the base url and keep everything before anchors and GET parameters
+                        relative_path = link.split(found_base_url)[-1]
+                        relative_path = relative_path.split('#')[0]
+                        relative_path = relative_path.split('?')[0]
+                        internal_links.append(relative_path)
 
         #Clean up all the double / from paths
         for i in range(len(internal_links)):
@@ -367,32 +357,20 @@ class webExplorer:
 
         external_links = []
         for link in all_links:
+            #Remove leading and trailing spaces
+            link = link.strip()
             #We first find out what's the base_url (website url)
             if len(link)>0 and len(link)<200: #We throw away links with more than 200 chars
                 if not (link[0] == "/" and link[1] != "/") or (":" in link):  # If it starts with a /, it is a relative path, we do not want that
                     #Find what is the website for that link
-                    found_base_url = re.match(self.base_url_regex, link)
-                    if found_base_url:
-                        found_base_url = found_base_url.group(0)
-                        found_base_url = found_base_url.replace('https://','')
-                        found_base_url = found_base_url.replace('http://','')
-                        found_base_url = found_base_url.replace(':80','')
-                        found_base_url = found_base_url.replace(':443','')
-                        found_base_url = found_base_url.replace('/','')
-                        found_base_url = found_base_url.split('#')[0]
-                        found_base_url = found_base_url.split('?')[0]
-                        found_base_url = found_base_url.replace('%20','')
-                        found_base_url = found_base_url.replace('www.','')
+                    found_base_url = self.extract_base_url(link)
+                    
+                    #We add it to the list if it is a different webpage
+                    if webpage != found_base_url and found_base_url is not None:
+                        external_links.append(found_base_url)
 
-                        #while ".." in found_base_url:
-                        #    found_base_url = found_base_url.replace('..','.')
-
-                        #We add it to the list if it is a different webpage
-                        if webpage != found_base_url and found_base_url is not None:
-                            external_links.append(found_base_url)
-
-        while '' in external_links:
-            external_links.remove('')
+        #while '' in external_links:
+        #    external_links.remove('')
 
         return self.filter_links(external_links)
 
@@ -408,7 +386,13 @@ class webExplorer:
                     keep_link = False
             #No poisonous extension found, so we proceed.
             if keep_link:
-                if "javascript:" in link or "mailto:" in link or "ftp:" in link or "file:" in link:
+                if "javascript:" in link.lower() or "mailto:" in link.lower():
+                    keep_link = False
+                elif "ftp:" in link.lower() or "file:" in link.lower():
+                    keep_link = False
+                elif "mail:" in link.lower():
+                    keep_link = False
+                elif "unescape(" in link.lower():
                     keep_link = False
                 elif "127.0.0.1" in link: #This is not correct either
                     keep_link = False
@@ -424,6 +408,27 @@ class webExplorer:
                 filtered_link_list.append(link)
 
         return filtered_link_list
+
+    def extract_base_url(self, link):
+        ''' Function returning the base url from an hyperlink '''
+        found_base_url = re.match(self.base_url_regex, link)
+        if found_base_url:
+            found_base_url = found_base_url.group(0)
+            found_base_url = found_base_url.replace('https://','')
+            found_base_url = found_base_url.replace('http://','')
+            found_base_url = found_base_url.replace('/','')
+            found_base_url = found_base_url.split('#')[0]
+            found_base_url = found_base_url.split('?')[0]
+            found_base_url = found_base_url.replace('www.','')
+            
+            if len(found_base_url)<1: #Back-up check to prevent '' to go through.
+                found_base_url = None
+            
+        else : 
+            found_base_url = None
+    
+        return found_base_url
+
 
     def get_clean_text_from_html_content(self,html_text):
         ''' Takes the html_text and uses Beautiful Soup to filter out unwanted
@@ -734,7 +739,7 @@ class webExplorer:
         while '  ' in text:
             text = re.sub("  ", ' ', text)
             
-#         #Now we tokenize the text in order to clean it up:
+#        #Now we tokenize the text in order to clean it up:
 #        word_list = text.split()
 #        filtered_text = ""
 #        for word in word_list:
@@ -746,8 +751,8 @@ class webExplorer:
 #        return filtered_text
 
         return text
-       
-
+        
+    
 
     def create_folder(self,folder_name):
         ''' Simple function taking a folder name and create it into the current working directory.'''
@@ -866,6 +871,41 @@ class webExplorer:
                 if self.verbose:  #Anouncement message 
                     print "Removing ApS mark for " + base_url + "..."
                 os.remove(self.main_directory+"web_content/"+base_url+"/aps.p")
+                
+    def clear_all_link_lists(self, redirect_count=None):
+        ''' Function going around and erasing the files containing the list of 
+        links for each website in order to do a fresh re-discovery'''
+        #Redirect_count argument is optional, if not given we take the current setting
+        if redirect_count is None:
+            redirect_count = self.redirect_count
+            
+        #Do the job for every website
+        for base_url in os.listdir(self.main_directory+"web_content/"):
+            # If CVR or ApS has been previously found, remove it for a fresh start
+            if os.path.isfile(self.main_directory+"web_content/"+base_url+"/external_urls_"+str(redirect_count)+"_redirect.p"):
+                if self.verbose:  #Anouncement message 
+                    print "Removing external URL list for " + base_url + "..."
+                os.remove(self.main_directory+"web_content/"+base_url+"/external_urls_"+str(redirect_count)+"_redirect.p")
+            
+            if self.verbose:  #Anouncement message 
+                    print "Removing external URL list for " + base_url + "..."
+            for filename in glob.glob(self.main_directory+"web_content/"+base_url+"/linklist/*.p"):                
+                os.remove(filename)
+            if os.path.isfile(self.main_directory+"web_content/"+base_url+"/linklist/.p"):
+                os.remove(self.main_directory+"web_content/"+base_url+"/linklist/.p")
+                
+    def remove_www_for_websites(self):
+        ''' Function going around and renaming folders to remove www. in front 
+        if there is any '''            
+        #Do the job for every website
+        for base_url in os.listdir(self.main_directory+"web_content/"):
+            if base_url.startswith('www.'):                 
+                #Rename the website iwthout the www.
+                #Just remove the file if the destination already exists
+                if os.path.exists(self.main_directory+"web_content/"+base_url[4:]):
+                    shutil.rmtree(self.main_directory+"web_content/"+base_url)
+                else:
+                    os.rename(self.main_directory+"web_content/"+base_url ,self.main_directory+"web_content/"+base_url[4:])
                 
     def list_danish_companies(self):
         ''' Function that returns a list object of danish companies '''
