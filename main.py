@@ -48,7 +48,7 @@ if __name__ == '__main__':
     
     # Verbose/debug configuration : 
     myWebExplorer.set_verbose(True)
-    #myWebExplorer.set_debug(True)
+    myWebExplorer.set_debug(True)
 
     # 3) Continue to explore the webpages until we reached degree_depth_level
     #print "2) Exploring web links: this will take VERY long (weeks)"

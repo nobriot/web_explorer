@@ -27,11 +27,18 @@ Last modified : 10/07/2016 by Nicolas Obriot
 #%% First section, all the different imports.
 import os.path, glob, os
 import shutil #Remove directories with files
-import urllib2 as url
-import re
-from bs4 import BeautifulSoup
-import pickle
+import urllib2 as url #Open URLs
+import re #Regex
+from bs4 import BeautifulSoup #HTML parsing
+import pickle #Saving Python variables
 
+#Extract text content from PDF files
+from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
+from pdfminer.converter import TextConverter
+from pdfminer.layout import LAParams
+from pdfminer.pdfpage import PDFPage
+
+#Plotting and network visualization
 import networkx as nx
 import matplotlib.pyplot as plt #For plotting graphs
 
@@ -100,7 +107,7 @@ class webExplorer:
             print "Please specify at least one URL/website to start from"
         else :
             # Filter what are base URLs in the arguement list and add them in the first level of the list of URL to visit.
-            self.to_visit_urls[0]=self.to_visit_urls[0].union(self.find_external_base_urls(None,url_list))
+            self.to_visit_urls[0]=self.to_visit_urls[0].union(self.filter_links(url_list))
 
     # Set number of redirections within single websites :
     def set_redirect_count(self,redirect_count=None):
@@ -223,25 +230,41 @@ class webExplorer:
                     print " - Hit http://"+base_url+"/"+internal_page
                 html_response= url.urlopen("http://"+base_url+"/"+internal_page)
                 html_text= html_response.read()
+                
+                #Initialize the list of links found on the internal page
+                link_list = []
 
-                # We replace all empty HTML tags with a space inside:
-                html_text = html_text.replace(">", "> ")
+                #If it points at a PDF or Word, we do something different, else treat the page as HTML : 
+                if not (self.is_PDF_link(internal_page) or self.is_Word_doc_link(internal_page)):
+                    # We replace all empty HTML tags with a space inside:
+                    html_text = html_text.replace(">", "> ")
+    
+                    # We use the beautiful soup to get the text from HTML :
+                    soup = self.get_clean_text_from_html_content(html_text)
+    
+                    # If URL is DTU, just create a placeholder file in order not to revisit the same page later
+                    if url_is_DTU:
+                        pagefile = open(filename,'w+')
+                        pagefile.close()
+                    else: # We save the page text content
+                        pagefile = open(filename,'w')
+                        pagefile.write(soup.get_text().encode('UTF-8'))
+                        pagefile.close()
+    
+                    #Find all the links in the webpage
+                    link_list = self.find_child_links_from_html_soup(soup,base_url)
 
-                # We use the beautiful soup to get the text from HTML :
-                soup = self.get_clean_text_from_html_content(html_text)
-
-                # If URL is DTU, just create a placeholder file in order not to revisit the same page later
-                if url_is_DTU:
-                    pagefile = open(filename,'w+')
-                    pagefile.close()
-                else: # We save the page text content
-                    pagefile = open(filename,'w')
-                    pagefile.write(soup.get_text().encode('UTF-8'))
-                    pagefile.close()
-
-                #Find all the links in the webpage
-                link_list = self.find_child_links_from_html_soup(soup,base_url)
-
+                elif self.is_PDF_link(internal_page) :
+                    #TODO: Do somehting with the PDF
+                    if self.debug:  # Debug message
+                        print "Found PDF page : "+ internal_page
+                    self.save_text_from_PDF(html_text, filename)
+                
+                elif self.is_Word_doc_link(internal_page) :
+                    #TODO: Do somehting with the Word Doc
+                    if self.debug:  # Debug message
+                        print "Found Word Doc page : "+ internal_page
+                
                 # Save the list of links in the folder                
                 filename = self.main_directory+"web_content/"+base_url+"/linklist/"+re.sub("/", '_', internal_page)+".p"
                 if self.debug:  #Show the filename being saved
@@ -376,7 +399,11 @@ class webExplorer:
 
 
     # This function remove undesirable links from a list (filenames, javascript, or blacklisted URLs)
-    def filter_links(self, link_list):
+    def filter_links(self, link_list):        
+         #The argument should be a list, but if a string was passed, we convert it
+        if type(link_list) is str:
+            link_list = link_list.split()
+            
         filtered_link_list = []
 
         for link in link_list:
@@ -518,6 +545,52 @@ class webExplorer:
         #Finally return the list
         return child_links
 
+    def is_PDF_link(self, link):
+        ''' Function that returns TRUE if the URL points at a PDF file '''
+        is_PDF = False
+        
+        pdf_link_regex = '.*\.[pP][dD][fF].*|^.*[Pp][Dd][fF]$'
+        if re.match(pdf_link_regex,link):
+            is_PDF = True
+        
+        return is_PDF
+        
+    def is_Word_doc_link(self, link):
+        ''' Function that returns TRUE if the URL points at a Word file '''
+        is_word_doc = False
+        
+        pdf_word_doc_regex = '.*\.[dD][oO][cC][xXmM]?.*|^.*[Dd][Oo][Cc][xXmM]?$'
+        if re.match(pdf_word_doc_regex,link):
+            is_word_doc = True
+        
+        return is_word_doc
+        
+    def save_text_from_PDF(self, pdfcontent, target_filename):
+        #TODO : This is not working yet
+        ''' Function that returns the text content from a PDF file
+        Package used : https://pypi.python.org/pypi/pdfminer/
+        Another page for it : http://www.unixuser.org/~euske/python/pdfminer/index.html
+        Test PDF file : https://9-11commission.gov/report/911Report.pdf'''
+        #Prepare the destination file
+        pdf_target_file = open(target_filename,'w+')
+        
+        #First declare a PDF manager
+        rsrcmgr = PDFResourceManager()
+        #Some parameter for PDF parsing
+        laparams = LAParams()
+        laparams.all_texts = True
+        laparams.detect_vertical = True
+        codec = 'utf-8'
+        #Then a device
+        device = TextConverter(rsrcmgr, pdf_target_file, codec=codec, laparams=laparams,imagewriter=None)
+        interpreter = PDFPageInterpreter(rsrcmgr, device)
+        for page in PDFPage.get_pages(pdfcontent):
+            page.rotate = (page.rotate) % 360
+            interpreter.process_page(page)
+        
+        #Finally close the file, we are done
+        pdf_target_file.close()        
+        
 #==============================================================================
 #    THIS will be revised later
 #==============================================================================
