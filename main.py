@@ -70,3 +70,9 @@ if __name__ == '__main__':
     
     #7) Create a network graph
     #myWebExplorer.create_web_network_graph()
+    
+#Couple of notes :
+#myWebExplorer = webExplorer("/home/shared/Scripts/web_explorer/",1,1)
+#myWebExplorer.set_verbose(True)
+#myWebExplorer.set_debug(True)
+#myWebExplorer.URL_scan("kom.aau.dk","group/12gr1010/Report.pdf")

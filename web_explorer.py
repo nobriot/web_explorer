@@ -233,7 +233,7 @@ class webExplorer:
                 
                 #Initialize the list of links found on the internal page
                 link_list = []
-
+    
                 #If it points at a PDF or Word, we do something different, else treat the page as HTML : 
                 if not (self.is_PDF_link(internal_page) or self.is_Word_doc_link(internal_page)):
                     # We replace all empty HTML tags with a space inside:
@@ -253,7 +253,7 @@ class webExplorer:
     
                     #Find all the links in the webpage
                     link_list = self.find_child_links_from_html_soup(soup,base_url)
-
+    
                 elif self.is_PDF_link(internal_page) :
                     #TODO: Do somehting with the PDF
                     if self.debug:  # Debug message
@@ -270,9 +270,11 @@ class webExplorer:
                 if self.debug:  #Show the filename being saved
                     print "- Saving file " + filename
                 pickle.dump(link_list,open(filename, "wb" ))
-
+    
                 return link_list
-            except: #In case the URL could not be opened, we just return nothing
+            except Exception, e:
+                if self.verbose:
+                    print "Exception thrown in URL_scan : %s" % e  #In case the URL could not be opened, we just return nothing
                 self.create_dummy_files(base_url, internal_page)
                 return []
         else:
@@ -571,8 +573,14 @@ class webExplorer:
         Package used : https://pypi.python.org/pypi/pdfminer/
         Another page for it : http://www.unixuser.org/~euske/python/pdfminer/index.html
         Test PDF file : https://9-11commission.gov/report/911Report.pdf'''
-        #Prepare the destination file
-        pdf_target_file = open(target_filename,'w+')
+        #First save the PDF :
+        pdf_file = open(target_filename+".pdf",'wb')
+        pdf_file.write(pdfcontent)
+        pdf_file.close()
+                
+        #Prepare the input and destination file
+        pdf_file = file(target_filename+".pdf", 'rb')
+        pdf_target_file = open(target_filename,'w')
         
         #First declare a PDF manager
         rsrcmgr = PDFResourceManager()
@@ -582,14 +590,18 @@ class webExplorer:
         laparams.detect_vertical = True
         codec = 'utf-8'
         #Then a device
-        device = TextConverter(rsrcmgr, pdf_target_file, codec=codec, laparams=laparams,imagewriter=None)
+        device = TextConverter(rsrcmgr, pdf_target_file, codec=codec, laparams=laparams, imagewriter=None)
         interpreter = PDFPageInterpreter(rsrcmgr, device)
-        for page in PDFPage.get_pages(pdfcontent):
+        # This function taken form the PDF manager stuff will save the PDF text content in the pdf_target_file
+        for page in PDFPage.get_pages(pdf_file):
             page.rotate = (page.rotate) % 360
             interpreter.process_page(page)
         
-        #Finally close the file, we are done
-        pdf_target_file.close()        
+        #Finally close the files, we are done
+        pdf_target_file.close() 
+        pdf_file.close()
+        #Erase the PDF file, we do not care : 
+        os.remove(target_filename+".pdf")
         
 #==============================================================================
 #    THIS will be revised later
