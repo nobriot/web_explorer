@@ -31,12 +31,16 @@ import urllib2 as url #Open URLs
 import re #Regex
 from bs4 import BeautifulSoup #HTML parsing
 import pickle #Saving Python variables
+import time # calculate elapsed time or do pauses in the execution
 
 #Extract text content from PDF files
 from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
 from pdfminer.converter import TextConverter
 from pdfminer.layout import LAParams
 from pdfminer.pdfpage import PDFPage
+
+#Extract text from docx documents
+from docx import opendocx, getdocumenttext
 
 #Plotting and network visualization
 import networkx as nx
@@ -53,7 +57,7 @@ class webExplorer:
 
     #Variable shared by all instances of webExplorer class
     # This is used to extract the URL of a website in the links (e.g. extracts google.fr from https://www.google.fr/something?query=myquery)
-    base_url_regex = '^https?://.+?\..+?/|^https?://.+?\..+?\?|^https?://.+?\..+?#|^https?://.+?\..+|^//.+?\..+?/|^//.+?\..+?\?|^//.+?\..+?#|^//.+?\..+'
+    base_url_regex = '^https?://.+?\..+?/|^https?://.+?\..+?\?|^https?://.+?\..+?#|^https?://.+?\..+|^//.+?\..+?/|^//.+?\..+?\?|^//.+?\..+?#|^//.+?\..+|^.+?\..+//'
 
     #Constructor : variable init when creating the object. Initializing variables
     def __init__(self, main_directory="", redirect_count=None, degree_depth_level=None, verbose = False):
@@ -74,6 +78,7 @@ class webExplorer:
         # different url list
         self.to_visit_urls = [] # Which URL are yet to visit
         self.to_visit_urls.append(set()) # We create a set for to_visit_urls[0]
+        self.to_visit_urls_back_up_filename = None 
 
         # A verbose boolean variable : if set to True, the class prints out exec info
         self.set_verbose(verbose) # Default is false.
@@ -86,9 +91,18 @@ class webExplorer:
         # CVR number registry
         self.CVR_registry = dict() # We will store it the following way : CVR_registry['website'] = "12345343" or = None
 
-        # Sets of base URLs (website url)
+        # Sets of base URLs (website url) 
+        # NOT USED AT THE MOMENT
         self.DTU_base_urls=set() # Domain name part of DTU
         self.non_DTU_base_urls = set() # Domain name not part of DTU
+        
+        #Create the needed folders (if they do not exist) for our web explorer : 
+        self.create_folder(self.main_directory + "web_content")
+        self.create_folder(self.main_directory + "variables")
+        self.create_folder(self.main_directory + "corpus")
+        self.create_folder(self.main_directory + "corpus/Danish")
+        self.create_folder(self.main_directory + "corpus/English")
+
 
     # Set the working directory for our object : (Where all the files will be stored)
     def set_main_directory(self,new_directory=""):
@@ -108,6 +122,24 @@ class webExplorer:
         else :
             # Filter what are base URLs in the arguement list and add them in the first level of the list of URL to visit.
             self.to_visit_urls[0]=self.to_visit_urls[0].union(self.filter_links(url_list))
+        
+        #Now filter the crap we have from User Input : 
+        new_to_visit_url_set = set()
+        for webpage in self.to_visit_urls[0]:
+            # Find the base url and remove the actual URL.                
+            base_url_webpage = self.extract_base_url(webpage)
+            if base_url_webpage : #The function can return "None" if not found
+                new_to_visit_url_set.add(base_url_webpage)
+                if self.debug:
+                    print "Filtering base URL for : "+ webpage + " - Result : " + base_url_webpage
+            else : 
+                new_to_visit_url_set.add(webpage)
+                if self.debug:
+                    print "Filtering base URL for : "+ webpage + " - Result : /!\\ None /!\\ -> URL is kept as such "
+            
+        #Now take the filtered set and put it into the actual set
+        self.to_visit_urls[0] = new_to_visit_url_set
+            
 
     # Set number of redirections within single websites :
     def set_redirect_count(self,redirect_count=None):
@@ -135,6 +167,20 @@ class webExplorer:
     # Sets the verbose for the class
     def set_debug(self,debug=False):
          self.debug = debug
+    
+    #Function to save the to_visit_url variable
+    def back_up_to_visit_url(self, target_filename=None):
+        if self.to_visit_urls_back_up_filename : 
+            pickle.dump(self.to_visit_urls,open(self.main_directory+"variables/"+self.to_visit_urls_back_up_filename, "wb" ))
+        elif target_filename: 
+            pickle.dump(self.to_visit_urls,open(self.main_directory+"variables/"+target_filename, "wb" ))
+        else:
+            if self.debug:
+                print "WARNING : Tried to save URL tree without defining a filename. The file will not be saved"
+    
+    # Function to save the name for saving the "to_visit_url" variable
+    def set_url_tree_back_up_filename(self, new_name):
+        self.to_visit_urls_back_up_filename = new_name
 
     # Functions
     def explore(self):
@@ -197,6 +243,7 @@ class webExplorer:
                 #print "Found external base URLs : "
                 #print external_base_urls
                 self.to_visit_urls[i+1]=self.to_visit_urls[i+1].union(external_base_urls)
+                self.back_up_to_visit_url()
 
                 if self.verbose:  #Anouncement message
                     print 'Finished webpage ' +webpage
@@ -228,7 +275,15 @@ class webExplorer:
                 # we open the URL and read the content
                 if self.debug:  #Show the requested URL
                     print " - Hit http://"+base_url+"/"+internal_page
+                # Make the HTTP query
                 html_response= url.urlopen("http://"+base_url+"/"+internal_page)
+                
+                #If he status code is 404, we create a dummy file, not to try again later
+                if html_response.code == 404:
+                    self.create_dummy_files(base_url, internal_page)
+                    raise Exception('HTTP Error 404: Not Found')
+                
+                #Read the text response
                 html_text= html_response.read()
                 
                 #Initialize the list of links found on the internal page
@@ -255,15 +310,16 @@ class webExplorer:
                     link_list = self.find_child_links_from_html_soup(soup,base_url)
     
                 elif self.is_PDF_link(internal_page) :
-                    #TODO: Do somehting with the PDF
+                    # Extract and save the PDF content
                     if self.debug:  # Debug message
                         print "Found PDF page : "+ internal_page
                     self.save_text_from_PDF(html_text, filename)
                 
                 elif self.is_Word_doc_link(internal_page) :
-                    #TODO: Do somehting with the Word Doc
+                    # Extract and save the doc content
                     if self.debug:  # Debug message
                         print "Found Word Doc page : "+ internal_page
+                    self.save_text_from_Word_doc(html_text, filename)
                 
                 # Save the list of links in the folder                
                 filename = self.main_directory+"web_content/"+base_url+"/linklist/"+re.sub("/", '_', internal_page)+".p"
@@ -275,7 +331,8 @@ class webExplorer:
             except Exception, e:
                 if self.verbose:
                     print "Exception thrown in URL_scan : %s" % e  #In case the URL could not be opened, we just return nothing
-                self.create_dummy_files(base_url, internal_page)
+                #Back off a litle when getting a HTTP error
+                time.sleep(5)
                 return []
         else:
             #Load the list of links from the page in the folder
@@ -343,10 +400,16 @@ class webExplorer:
             #Remove leading and trailing spaces
             link = link.strip()
             #We first find out what's the base_url (website url)
-            if len(link)>0 and len(link)<200: #We throw away links with more than 200 chars
-                if (link[0] == "/" and link[1] != "/") or (":" not in link): # If it starts with a / but is not //, it is a relative path
-                    #Remove trailing "/"
-                    link = link[1:]
+            if len(link)>0 and len(link)<220: #We throw away links with more than 220 chars (255 bytes for filenames in Unix)
+                if (link[0] == "/" and link[1] != "/") or (":" not in link and "//" not in link): # If it starts with a / but is not //, it is a relative path
+                    #Remove eventual trailing "/"
+                    if link[0] == "/" : 
+                        link = link[1:]
+                        
+                    # Remove parameters or anchors
+                    link = link.split('#')[0]
+                    #link = link.split('?')[0]
+                    
                     #Append to the current list
                     internal_links.append(link)
 
@@ -359,14 +422,21 @@ class webExplorer:
                         relative_path = link.split(found_base_url)[-1]
                         relative_path = relative_path.split('#')[0]
                         relative_path = relative_path.split('?')[0]
+                        #Remove eventual trailing "/" and "//"
+                        while '//' in relative_path:
+                            relative_path=relative_path.replace('//','/')
+                        if len(relative_path) >1 :
+                            if relative_path[0] == "/": 
+                                relative_path = relative_path[1:]                        
+                        
                         internal_links.append(relative_path)
 
-        #Clean up all the double / from paths
-        for i in range(len(internal_links)):
-            while '//' in internal_links[i]:
-                internal_links[i]=internal_links[i].replace('//','/')
-            while '..' in internal_links[i]:
-                internal_links[i]=internal_links[i].replace('..','.')
+        #Clean up all the double / from paths : I do not know why I wrote that before
+#        for i in range(len(internal_links)):
+#            while '//' in internal_links[i]:
+#                internal_links[i]=internal_links[i].replace('//','/')
+#            while '..' in internal_links[i]:
+#                internal_links[i]=internal_links[i].replace('..','.')
 
         return self.filter_links(internal_links)
 
@@ -561,8 +631,8 @@ class webExplorer:
         ''' Function that returns TRUE if the URL points at a Word file '''
         is_word_doc = False
         
-        pdf_word_doc_regex = '.*\.[dD][oO][cC][xXmM]?.*|^.*[Dd][Oo][Cc][xXmM]?$'
-        if re.match(pdf_word_doc_regex,link):
+        word_doc_regex = '.*\.[dD][oO][cC][xXmM]?.*|^.*[Dd][Oo][Cc][xXmM]?$'
+        if re.match(word_doc_regex,link):
             is_word_doc = True
         
         return is_word_doc
@@ -573,7 +643,7 @@ class webExplorer:
         Package used : https://pypi.python.org/pypi/pdfminer/
         Another page for it : http://www.unixuser.org/~euske/python/pdfminer/index.html
         Test PDF file : https://9-11commission.gov/report/911Report.pdf'''
-        #First save the PDF :
+        #First save the PDF locally :
         pdf_file = open(target_filename+".pdf",'wb')
         pdf_file.write(pdfcontent)
         pdf_file.close()
@@ -602,6 +672,35 @@ class webExplorer:
         pdf_file.close()
         #Erase the PDF file, we do not care : 
         os.remove(target_filename+".pdf")
+        
+    def save_text_from_Word_doc(self, doccontent, target_filename):
+        #First save the file locally :
+        doc_file = open(target_filename+".doc",'wb')
+        doc_file.write(doccontent)
+        doc_file.close()
+                           
+        # Decode the DOC from the local file
+        document = opendocx(str(target_filename+".doc"))
+        paratextlist = getdocumenttext(document)
+        
+        # Make explicit unicode version
+        newparatextlist = []
+        for paratext in paratextlist:
+        	newparatextlist.append(paratext.encode("utf-8"))
+        
+        # Join the list into a long string
+        docText = '\n'.join(newparatextlist)
+        
+        # Save the extracted text in the target file
+        doc_target_file = open(target_filename,'w')
+        doc_target_file.write(docText)
+        doc_target_file.close()       
+        
+        #Erase the local DOC file, we do not care : 
+        os.remove(target_filename+".doc")
+        
+        #Stop exec and check the result manually : 
+        raise Exception('Doc file was saved! Please checked it worked at : ' + target_filename) 
         
 #==============================================================================
 #    THIS will be revised later
@@ -1037,3 +1136,4 @@ class webExplorer:
         nx.draw_networkx_edges(web_graph,pos,alpha=0.5)
         plt.savefig(self.main_directory+"DTU network.png",dpi=40)
         plt.show()
+        
