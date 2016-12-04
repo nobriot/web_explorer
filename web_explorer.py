@@ -69,7 +69,7 @@ class webExplorer:
         self.url_blacklist= ".*google\..*|.*facebook\..*|.*instagram\..*|.*youtube\..*|.*twitter\..*|.*linkedin\..*|.*youtu\.be.*|.*goo\.gl.*|.*flickr\..*|.*bing\..*|.*itunes\..*|.*dropbox\..*|.*independent\.co.*" #All the websites we want to ignore
 
         #LIst of extension, that if we find in a URL, the URL will be discarded
-        self.extensions_to_ignore = ['.*\.[pP][dD][fF].*|^.*[Pp][Dd][fF]$','^.*\.[Xx][lL][sS]$','^.*\.[Dd][oO][cC][mMxX]?$','.*\.[aA][sS][pP][xX]?.*|^.*[aA][sS][pP][xX]?$','.*\.[aA][sS][hH][xX].*|^.*[aA][sS][hH][xX]$','.*\.[pP][nN][gG].*|^.*[pP][nN][gG]$','.*\.[jJ][Pp][eE]?[gG].*|^.*[jJ][Pp][eE]?[gG]$','.*\.flv.*|^.*flv$','.*\.mp4.*|^.*mp4$','.*\.mov.*|^.*mov$']
+        self.extensions_to_ignore = ['.*\.[pP][dD][fF].*|^.*[Pp][Dd][fF]$','^.*\.[Xx][lL][sS]$','^.*\.[Dd][oO][cC][mMxX]?$','.*\.[aA][sS][hH][xX].*|^.*[aA][sS][hH][xX]$','.*\.[pP][nN][gG].*|^.*[pP][nN][gG]$','.*\.[jJ][Pp][eE]?[gG].*|^.*[jJ][Pp][eE]?[gG]$','.*\.flv.*|^.*flv$','.*\.mp4.*|^.*mp4$','.*\.mov.*|^.*mov$']
 
         # Set the exploration variables
         self.set_redirect_count(redirect_count)
@@ -100,12 +100,18 @@ class webExplorer:
         self.create_folder(self.main_directory + "web_content")
         self.create_folder(self.main_directory + "variables")
         self.create_folder(self.main_directory + "corpus")
+        self.create_folder(self.main_directory + "graphs")
         self.create_folder(self.main_directory + "corpus/Danish")
         self.create_folder(self.main_directory + "corpus/English")
-
+    
+    ########################################################################
+    ##                            Set functions                           ##
+    ########################################################################
 
     # Set the working directory for our object : (Where all the files will be stored)
     def set_main_directory(self,new_directory=""):
+        ''' Function that sets the main directory, where all the files will 
+        be stored'''
         if new_directory == "" :
             self.main_directory = os.getcwd()+'/'
         else:
@@ -162,14 +168,21 @@ class webExplorer:
 
     # Sets the verbose for the class
     def set_verbose(self,verbose=False):
-         self.verbose = verbose
+        ''' Sets the verbose mode for the web explorer '''
+        self.verbose = verbose
          
     # Sets the verbose for the class
     def set_debug(self,debug=False):
-         self.debug = debug
+        ''' Sets the debug mode for the web explorer '''
+        self.debug = debug
     
     #Function to save the to_visit_url variable
     def back_up_to_visit_url(self, target_filename=None):
+        ''' Function that saves the to_visit_url array in a pickle variable in 
+        the main directory inside a folder named "variables". 
+        If the to_visit_urls_back_up_filename name is defined in the WebExplorer
+        Then it the variable back-up will take this name. Else the name must be 
+        passed in the function argument '''
         if self.to_visit_urls_back_up_filename : 
             pickle.dump(self.to_visit_urls,open(self.main_directory+"variables/"+self.to_visit_urls_back_up_filename, "wb" ))
         elif target_filename: 
@@ -177,10 +190,27 @@ class webExplorer:
         else:
             if self.debug:
                 print "WARNING : Tried to save URL tree without defining a filename. The file will not be saved"
+                
+    def load_previous_to_visit_url(self,target_filename=None):
+        ''' Function that loads a previously saved to_visit_url with the 
+        back_up_to_visit_url() function'''
+        if self.to_visit_urls_back_up_filename : 
+            self.to_visit_urls=pickle.load(open(self.main_directory+"variables/"+self.to_visit_urls_back_up_filename, "rb" ))
+        elif target_filename: 
+            self.to_visit_urls=pickle.load(open(self.main_directory+"variables/"+target_filename, "rb" ))
+        else:
+            if self.debug:
+                print "WARNING : Tried to save URL tree without defining a filename. The file will not be saved"
     
     # Function to save the name for saving the "to_visit_url" variable
     def set_url_tree_back_up_filename(self, new_name):
+        ''' Functions that sets the name for the target file backing up the 
+        "to_visit_url" variable. See back_up_to_visit_url() function '''
         self.to_visit_urls_back_up_filename = new_name
+
+    ########################################################################
+    ##                   Exploring and parsing functions                  ##
+    ########################################################################
 
     # Functions
     def explore(self):
@@ -261,13 +291,14 @@ class webExplorer:
             Returns a list object with the list of Links found on the visited page'''
         # Prepare the file name for the corresponding website
         filename = self.main_directory+"web_content/"+base_url+"/cleartext/"+re.sub("/", '_', internal_page)+".txt"
+        links_filename = self.main_directory+"web_content/"+base_url+"/linklist/"+re.sub("/", '_', internal_page)+".p"
 
         #Remove trailing "/"
         while internal_page[-1:] == "/" :
             internal_page = internal_page[:-1]
 
         # If the page has not been visited, we just visit it
-        if not os.path.isfile(filename):
+        if not os.path.isfile(filename) or not os.path.isfile(links_filename):
             #First find whether it is a DTU page and store the base URL
             url_is_DTU = re.search('.*\.dtu.*', base_url)
 
@@ -322,10 +353,9 @@ class webExplorer:
                     self.save_text_from_Word_doc(html_text, filename)
                 
                 # Save the list of links in the folder                
-                filename = self.main_directory+"web_content/"+base_url+"/linklist/"+re.sub("/", '_', internal_page)+".p"
                 if self.debug:  #Show the filename being saved
-                    print "- Saving file " + filename
-                pickle.dump(link_list,open(filename, "wb" ))
+                    print "- Saving file " + links_filename
+                pickle.dump(link_list,open(links_filename, "wb" ))
     
                 return link_list
             except Exception, e:
@@ -336,10 +366,9 @@ class webExplorer:
                 return []
         else:
             #Load the list of links from the page in the folder
-            filename = self.main_directory+"web_content/"+base_url+"/linklist/"+re.sub("/", '_', internal_page)+".p"
             if self.debug:  #Show the filename being opened          
-                print "- Opening file " + filename
-            link_list = self.filter_links(pickle.load(open(filename, "rb" )))
+                print "- Opening file " + links_filename
+            link_list = self.filter_links(pickle.load(open(links_filename, "rb" )))
             return link_list
 
 
@@ -471,7 +500,9 @@ class webExplorer:
 
 
     # This function remove undesirable links from a list (filenames, javascript, or blacklisted URLs)
-    def filter_links(self, link_list):        
+    def filter_links(self, link_list):
+        ''' Function that filter undesired links, like javascript, mailto: or 
+        other unreachable links'''
          #The argument should be a list, but if a string was passed, we convert it
         if type(link_list) is str:
             link_list = link_list.split()
@@ -638,8 +669,8 @@ class webExplorer:
         return is_word_doc
         
     def save_text_from_PDF(self, pdfcontent, target_filename):
-        #TODO : This is not working yet
-        ''' Function that returns the text content from a PDF file
+        ''' Function that saves the text content from a PDF file in the 
+        filename given in argument
         Package used : https://pypi.python.org/pypi/pdfminer/
         Another page for it : http://www.unixuser.org/~euske/python/pdfminer/index.html
         Test PDF file : https://9-11commission.gov/report/911Report.pdf'''
@@ -674,6 +705,10 @@ class webExplorer:
         os.remove(target_filename+".pdf")
         
     def save_text_from_Word_doc(self, doccontent, target_filename):
+        ''' Function that returns the text content from a PDF file
+        Package used : docx
+        TODO : test the function, ensure that it works both for doc and docx types
+        '''
         #First save the file locally :
         doc_file = open(target_filename+".doc",'wb')
         doc_file.write(doccontent)
@@ -724,6 +759,11 @@ class webExplorer:
 #        if None in url_tree[webpage_base_url]:
 #            url_tree[webpage_base_url].remove(None)
 
+
+
+    ########################################################################
+    ##                      Corpus creation functions                     ##
+    ########################################################################
 
     def find_language(self,text):
         ''' Find whether the text is in English, Danish or unknown by looking up
@@ -1077,7 +1117,13 @@ class webExplorer:
                 os.remove(filename)
             if os.path.isfile(self.main_directory+"web_content/"+base_url+"/linklist/.p"):
                 os.remove(self.main_directory+"web_content/"+base_url+"/linklist/.p")
-                
+  
+
+    ########################################################################
+    ##                        Maintenance functions                       ##
+    ########################################################################
+
+              
     def remove_www_for_websites(self):
         ''' Function going around and renaming folders to remove www. in front 
         if there is any '''            
@@ -1100,6 +1146,10 @@ class webExplorer:
                 danish_companies.append(base_url)
         
         return danish_companies
+        
+    ########################################################################
+    ##                     Network and graph functions                    ##
+    ########################################################################
         
     def create_web_network_graph(self):
         ''' Functions that creates a NetworkX network visualization from the 
@@ -1136,4 +1186,88 @@ class webExplorer:
         nx.draw_networkx_edges(web_graph,pos,alpha=0.5)
         plt.savefig(self.main_directory+"DTU network.png",dpi=40)
         plt.show()
+    
+    def export_csv_dataset_for_GEPHI(self, danish_companies_filtering=True):
+        ''' Function exporting a CSV dataset based on the exploration the 
+        made earlier. It requires a back-up of "to_visit_url" in the variable 
+        folder (Refer to the back_up_to_visit_url() function)
+        Some docs about GEPHI : 
+        http://www.martingrandjean.ch/introduction-to-network-visualization-gephi/
+        '''
+        #Each website will have an Id, it will be stored in this dictionary : 
+        website_id = dict()
+        last_id = 0 #Keep track of the highest ID number that was given        
+
+        #Start a new CSV file
+        nodes_output_file = open(self.main_directory + "graphs/GEPHI_nodes.csv", "wb")
+        #Write the headers : 
+        nodes_output_file.write('Id,Label\r\n')
+        
+        for website_list in self.to_visit_urls:
+            for website in website_list:
+                # Website is not added yet
+                if website not in website_id : 
+                    add_website = False
+                    # Apply filtering to website for Danish companies (or not)
+                    if danish_companies_filtering :
+                        if self.is_danish_company(website) or website=="dtu.dk":
+                            add_website = True
+                    else : 
+                        add_website = True
+                        
+                    # Check whether the website already has an ID, if not, assign one : 
+                    if add_website:                     
+                        last_id = last_id +1
+                        website_id[website] = last_id    
+                        # Add the newbie website in the CSV file
+                        nodes_output_file.write(str(last_id)+","+ website+ "\r\n")
+        
+        # Finally close the file        
+        nodes_output_file.close()
+        
+        #Now we register the edges and save them into a CSV as well
+        edges_output_file = open(self.main_directory + "graphs/GEPHI_edges.csv", "wb")
+        edges_output_file.write('Source,Target\r\n') #Write the headers 
+        
+        #Look up our website IDs and check their connections : 
+        for website in website_id:
+            #Load up the links from this website to other websites
+            filename = self.main_directory+"web_content/"+website+"/external_urls_"+str(self.redirect_count)+"_redirect.p"
+            if os.path.isfile(filename):
+                external_base_urls=pickle.load(open(filename, "rb" ))
+                
+                #Now we also filter the list of external links, just by looking at which website have IDs (filtering happened at the moment we assigned IDs)
+                for external_link in external_base_urls:
+                    if external_link in website_id :# The external link is also in the graph, so the connection is added
+                        # Add the newbie website in the CSV file
+                        edges_output_file.write(str(website_id[website])+","+ str(website_id[external_link])+ "\r\n")
+                    
+        # Finally close the file        
+        edges_output_file.close()
+        
+        
+    ########################################################################
+    ##                          Pythonic functions                        ##
+    ########################################################################
+        
+    # A print function in order to print the main info fo the object instance        
+    def __str__(self):
+        text =  "WebExplorer Object. Redirect count within websites : " + str(self.redirect_count)  + " - Websites exploration depth : "+str(self.degree_depth_level)+"\n"         
+        return text
+    
+    #Defining which value is return when calling len() on the object       
+    def __len__(self):
+        ''' Just return how many website are scanned or on their way to 
+        be scanned'''
+        total_length = 0 
+        for website_list in self.to_visit_urls:
+            total_length = total_length+len(website_list)
+        return total_length
+        
+    #This will be printed when typing a class instance variable in the console : 
+    def __repr__(self):
+        return "<WebExplorer object>"
+    
+        
+        
         
