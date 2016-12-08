@@ -67,6 +67,7 @@ class webExplorer:
 
         # A list of websites we do not want to visit at all.
         self.url_blacklist= ".*google\..*|.*facebook\..*|.*instagram\..*|.*youtube\..*|.*twitter\..*|.*linkedin\..*|.*youtu\.be.*|.*goo\.gl.*|.*flickr\..*|.*bing\..*|.*itunes\..*|.*dropbox\..*|.*independent\.co.*" #All the websites we want to ignore
+        self.webpages_to_skip = [] # A list of webpages that must not be visited at the moment (e.g. our IP was banned temporarly from the website, so skip the attempts)
 
         #LIst of extension, that if we find in a URL, the URL will be discarded
         self.extensions_to_ignore = ['.*\.[pP][dD][fF].*|^.*[Pp][Dd][fF]$','^.*\.[Xx][lL][sS]$','^.*\.[Dd][oO][cC][mMxX]?$','.*\.[pP][nN][gG].*|^.*[pP][nN][gG]$','.*\.[jJ][Pp][eE]?[gG].*|^.*[jJ][Pp][eE]?[gG]$','.*\.flv.*|^.*flv$','.*\.mp4.*|^.*mp4$','.*\.mov.*|^.*mov$']
@@ -232,56 +233,60 @@ class webExplorer:
         for i in range(self.degree_depth_level):
             self.to_visit_urls.append(set())
             for webpage in self.to_visit_urls[i]:
-
-                #Prepare the variable that we add into the future URL to visit
-                external_base_urls = set()
-
-                # == The base URL has already been visited and we know the external URLs for this redirect count
-                if os.path.isfile(self.main_directory+"web_content/"+webpage+"/external_urls_"+str(self.redirect_count)+"_redirect.p"):
-                    if not re.match("^[\.]+$",webpage): ## TODO : This is ugly, should be removed if possible (added it because some of the external_urls(redirect_count).p contain . as a base URL and is not filtered when loaded again)
-                        if self.verbose:  #Anouncement message                     
-                            print webpage + " has already been visited, loading external URLs..."
+                if webpage not in self.webpages_to_skip: #Proceed with the website only if it reachable
+                    #Prepare the variable that we add into the future URL to visit
+                    external_base_urls = set()
+    
+                    # == The base URL has already been visited and we know the external URLs for this redirect count
+                    if os.path.isfile(self.main_directory+"web_content/"+webpage+"/external_urls_"+str(self.redirect_count)+"_redirect.p"):
+                        if not re.match("^[\.]+$",webpage): ## TODO : This is ugly, should be removed if possible (added it because some of the external_urls(redirect_count).p contain . as a base URL and is not filtered when loaded again)
+                            if self.verbose:  #Anouncement message                     
+                                print webpage + " has already been visited, loading external URLs..."
+                            filename = self.main_directory+"web_content/"+webpage+"/external_urls_"+str(self.redirect_count)+"_redirect.p"
+                            external_base_urls=pickle.load(open(filename, "rb" ))
+    
+                    # == The base URL has not been visited yet
+                    else:
+                        # 1) Create a folder for the website in the content folder. Create sub-folders "cleartext" and "linklist"
+                        if self.verbose:  #Anouncement message 
+                            print "Preparing folders for " + webpage
+                        self.create_folder(self.main_directory+"web_content/"+webpage)
+                        self.create_folder(self.main_directory+"web_content/"+webpage+"/cleartext")
+                        self.create_folder(self.main_directory+"web_content/"+webpage+"/linklist")
+    
+                        # 2) Prepare a variable which contains all the external websites found from the website
+                        internal_urls = set()
+                        internal_urls.add("") #We put the base URL up on the list as the first internal URL to visit
+    
+                        # 3) Explore within the website
+                        for j in range(self.redirect_count): # How many times we will follow redirections within the same website
+                            # Scan the URL (retrieve the content, internal links and external links)
+                            print "Scanning "+webpage + " iteration " + str(j+1)
+                            for internal_page in internal_urls:
+                                #If the webpage is malfunctioning or unreachable, we just skip it for now and try again later
+                                if webpage  in self.webpages_to_skip:
+                                    break #Get out of the loop and abort this website
+                                # else : Scan the webpage
+                                all_links = self.URL_scan(webpage, internal_page)
+    
+                                # Find the internal links and add them to the discovery for the next iteration
+                                internal_urls= internal_urls.union(self.find_internal_links(webpage,all_links))
+    
+                                # Find external base URLs and add them to the list of external URLs.
+                                external_base_urls= external_base_urls.union(self.find_external_base_urls(webpage,all_links))
+    
+                        # When done for the website, we save the external base URLs
                         filename = self.main_directory+"web_content/"+webpage+"/external_urls_"+str(self.redirect_count)+"_redirect.p"
-                        external_base_urls=pickle.load(open(filename, "rb" ))
-
-                # == The base URL has not been visited yet
-                else:
-                    # 1) Create a folder for the website in the content folder. Create sub-folders "cleartext" and "linklist"
-                    if self.verbose:  #Anouncement message 
-                        print "Preparing folders for " + webpage
-                    self.create_folder(self.main_directory+"web_content/"+webpage)
-                    self.create_folder(self.main_directory+"web_content/"+webpage+"/cleartext")
-                    self.create_folder(self.main_directory+"web_content/"+webpage+"/linklist")
-
-                    # 2) Prepare a variable which contains all the external websites found from the website
-                    internal_urls = set()
-                    internal_urls.add("") #We put the base URL up on the list as the first internal URL to visit
-
-                    # 3) Explore within the website
-                    for j in range(self.redirect_count): # How many times we will follow redirections within the same website
-                        # Scan the URL (retrieve the content, internal links and external links)
-                        print "Scanning "+webpage + " iteration " + str(j+1)
-                        for internal_page in internal_urls:
-                            all_links = self.URL_scan(webpage, internal_page)
-
-                            # Find the internal links and add them to the discovery for the next iteration
-                            internal_urls= internal_urls.union(self.find_internal_links(webpage,all_links))
-
-                            # Find external base URLs and add them to the list of external URLs.
-                            external_base_urls= external_base_urls.union(self.find_external_base_urls(webpage,all_links))
-
-                    # When done for the website, we save the external base URLs
-                    filename = self.main_directory+"web_content/"+webpage+"/external_urls_"+str(self.redirect_count)+"_redirect.p"
-                    pickle.dump(external_base_urls,open(filename, "wb" ))
-
-                # Add all the new found websites to the list of website to visit at the next "Web level"
-                #print "Found external base URLs : "
-                #print external_base_urls
-                self.to_visit_urls[i+1]=self.to_visit_urls[i+1].union(external_base_urls)
-                self.back_up_to_visit_url()
-
-                if self.verbose:  #Anouncement message
-                    print 'Finished webpage ' +webpage
+                        pickle.dump(external_base_urls,open(filename, "wb" ))
+    
+                    # Add all the new found websites to the list of website to visit at the next "Web level"
+                    #print "Found external base URLs : "
+                    #print external_base_urls
+                    self.to_visit_urls[i+1]=self.to_visit_urls[i+1].union(external_base_urls)
+                    self.back_up_to_visit_url()
+    
+                    if self.verbose:  #Anouncement message
+                        print 'Finished webpage ' +webpage
             print 'Finished web level %d' %(i+1) #So we know how far it went on the console
     ##End of explore()
 
@@ -346,12 +351,14 @@ class webExplorer:
                     link_list = self.find_child_links_from_html_soup(soup,base_url)
     
                 elif self.is_PDF_link(internal_page) :
+                    #Reset pdf via terminal :  find ./web_content/ -name *.pdf.txt | tr "\n" "\0" | xargs -0 rm
                     # Extract and save the PDF content
                     if self.debug:  # Debug message
                         print "Found PDF page : "+ internal_page
                     self.save_text_from_PDF(html_text, filename)
                 
                 elif self.is_Word_doc_link(internal_page) :
+                    #Reset doc via terminal :  find ./web_content/ -name *.doc.txt | tr "\n" "\0" | xargs -0 rm
                     # Extract and save the doc content
                     if self.debug:  # Debug message
                         print "Found Word Doc page : "+ internal_page
@@ -366,6 +373,11 @@ class webExplorer:
             except Exception, e:
                 if self.verbose:
                     print "Exception thrown in URL_scan : %s" % e  #In case the URL could not be opened, we just return nothing
+                if str(e) == "<urlopen error [Errno 111] Connection refused>" :
+                    self.webpages_to_skip.append(base_url)
+                else:
+                    if self.verbose:
+                        print "The exception was not '<urlopen error [Errno 111] Connection refused>'"
                 #Back off a litle when getting a HTTP error
                 time.sleep(5)
                 return []
