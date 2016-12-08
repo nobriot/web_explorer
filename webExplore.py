@@ -3,7 +3,7 @@
 webExplore.py
 
 Small command line tool for using the web_explorer python utility.
-Copyright (C) 2016  Nicolas Obriot
+Copyright (C) 2016  Nicolas Obriot - Sabrina Woltmann
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -19,8 +19,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 Created on Sun Jul 10 19:50:46 2016
 
-@author: Nicolas Obriot
-Last modified : 10/07/2016 by Nicolas Obriot
+@author: Sabrina Woltmann, Nicolas Obriot
+Last modified : 08/12/2016 by Nicolas Obriot
 """
 
 #%% First section, all the different imports.
@@ -37,6 +37,7 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--redirect-count', type=int, dest='redirect_count', metavar='RedirectCount', help='Defines how many redirections are followed within a website when scanning it')
     parser.add_argument('-l', '--depth-level', type=int, dest='depth_level', metavar='DepthLevel', help='Defines the level depth of the web exploration.')
     parser.add_argument('-v','--verbose', action='store_true', help='Verbose mode')
+    parser.add_argument('-n','--name', type=str, dest='exploration_name', metavar='ExplorationName', help='Defines a name for this exploration run. The same name can subsequently be used to "resume" a previously aborted exploration')
     parser.add_argument('--debug', action='store_true', help='Print out debugging messages')
     args = parser.parse_args()
 
@@ -60,6 +61,10 @@ if __name__ == '__main__':
     if args.depth_level is not None :
         print "Exploration depth: " +  str(args.depth_level)
         myWebExplorer.set_exploring_depth(args.depth_level)
+        
+    if args.exploration_name is not None :
+        print "Exploration run name: " +  str(args.exploration_name)
+        myWebExplorer.set_url_tree_back_up_filename(args.exploration_name)
 
     #Set the verbose and debugging modes
     myWebExplorer.set_verbose(args.verbose)

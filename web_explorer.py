@@ -3,7 +3,7 @@
 Web_explorer.py
 
 Small Python utility used for scanning text content from websites
-Copyright (C) 2016  Nicolas Obriot
+Copyright (C) 2016  Nicolas Obriot - Sabrina Woltmann
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 Created on Jun 22 18:00:00 2016
 
 @author: Sabrina Woltmann, Nicolas Obriot
-Last modified : 10/07/2016 by Nicolas Obriot
+Last modified : 08/12/2016 by Nicolas Obriot
 """
 
 #%% First section, all the different imports.
@@ -69,7 +69,7 @@ class webExplorer:
         self.url_blacklist= ".*google\..*|.*facebook\..*|.*instagram\..*|.*youtube\..*|.*twitter\..*|.*linkedin\..*|.*youtu\.be.*|.*goo\.gl.*|.*flickr\..*|.*bing\..*|.*itunes\..*|.*dropbox\..*|.*independent\.co.*" #All the websites we want to ignore
 
         #LIst of extension, that if we find in a URL, the URL will be discarded
-        self.extensions_to_ignore = ['.*\.[pP][dD][fF].*|^.*[Pp][Dd][fF]$','^.*\.[Xx][lL][sS]$','^.*\.[Dd][oO][cC][mMxX]?$','.*\.[aA][sS][hH][xX].*|^.*[aA][sS][hH][xX]$','.*\.[pP][nN][gG].*|^.*[pP][nN][gG]$','.*\.[jJ][Pp][eE]?[gG].*|^.*[jJ][Pp][eE]?[gG]$','.*\.flv.*|^.*flv$','.*\.mp4.*|^.*mp4$','.*\.mov.*|^.*mov$']
+        self.extensions_to_ignore = ['.*\.[pP][dD][fF].*|^.*[Pp][Dd][fF]$','^.*\.[Xx][lL][sS]$','^.*\.[Dd][oO][cC][mMxX]?$','.*\.[pP][nN][gG].*|^.*[pP][nN][gG]$','.*\.[jJ][Pp][eE]?[gG].*|^.*[jJ][Pp][eE]?[gG]$','.*\.flv.*|^.*flv$','.*\.mp4.*|^.*mp4$','.*\.mov.*|^.*mov$']
 
         # Set the exploration variables
         self.set_redirect_count(redirect_count)
@@ -168,12 +168,17 @@ class webExplorer:
 
     # Sets the verbose for the class
     def set_verbose(self,verbose=False):
-        ''' Sets the verbose mode for the web explorer '''
+        ''' Sets the verbose mode for the web explorer
+        When verbose is set to "True", all kind of run-time information will be
+        printed '''
         self.verbose = verbose
          
     # Sets the verbose for the class
     def set_debug(self,debug=False):
-        ''' Sets the debug mode for the web explorer '''
+        ''' Sets the debug mode for the web explorer 
+        When debug is set to "True", all kind of function specific and non user
+        friend run-time information will be printed in order to trace what 
+        functions are doing'''
         self.debug = debug
     
     #Function to save the to_visit_url variable
@@ -761,9 +766,9 @@ class webExplorer:
 
 
 
-    ########################################################################
-    ##                      Corpus creation functions                     ##
-    ########################################################################
+    #########################################################################
+    ## Corpus creation functions, used subsequently by R for Text analysis ##
+    #########################################################################
 
     def find_language(self,text):
         ''' Find whether the text is in English, Danish or unknown by looking up
@@ -987,8 +992,12 @@ class webExplorer:
                 os.makedirs(folder_name)
         except:
             print "ERROR : Could not create folder '"+folder_name+"'. Expect the script to experience problems."
-            
+          
+          
     
+    ########################################################################
+    ##           Functions related to Danish companies discovery          ##
+    ########################################################################        
     
     def find_CVR_numbers(self):
         ''' Function scanning the content of text files (with .txt extension) 
@@ -1075,13 +1084,28 @@ class webExplorer:
         else:
             return False
             
+    def list_danish_companies(self):
+        ''' Function that returns a list object of danish companies '''
+        danish_companies = []
+        
+        for base_url in os.listdir(self.main_directory+"web_content/"):
+            if self.is_danish_company(base_url):
+                danish_companies.append(base_url)
+        
+        return danish_companies
+            
     def get_CVR_number(self,base_url) :
         '''Return the CVR number of a company, else returns None'''
         if self.has_cvr_number(base_url) : 
             return pickle.load(open(self.main_directory+"web_content/"+base_url+"/cvr.p", "rb"))
         else :
             return None
-            
+        
+        
+    ########################################################################
+    ##                        Maintenance functions                       ##
+    ########################################################################        
+        
     def clear_all_CVR_numbers(self) :
         ''' Function going around and erasing the files containing the CVR data
         in order to do a fresh re-discovery'''
@@ -1118,15 +1142,13 @@ class webExplorer:
             if os.path.isfile(self.main_directory+"web_content/"+base_url+"/linklist/.p"):
                 os.remove(self.main_directory+"web_content/"+base_url+"/linklist/.p")
   
-
-    ########################################################################
-    ##                        Maintenance functions                       ##
-    ########################################################################
-
               
     def remove_www_for_websites(self):
-        ''' Function going around and renaming folders to remove www. in front 
-        if there is any '''            
+        ''' This function goes around and renaming folders to remove www. in front 
+        if there is any. 
+        <!> Caution : It has been created to clean up previously messed up folder 
+        structure. Normally www. are removed by the self.extract_base_url() 
+        function and normally this function has no use.'''            
         #Do the job for every website
         for base_url in os.listdir(self.main_directory+"web_content/"):
             if base_url.startswith('www.'):                 
@@ -1137,15 +1159,7 @@ class webExplorer:
                 else:
                     os.rename(self.main_directory+"web_content/"+base_url ,self.main_directory+"web_content/"+base_url[4:])
                 
-    def list_danish_companies(self):
-        ''' Function that returns a list object of danish companies '''
-        danish_companies = []
-        
-        for base_url in os.listdir(self.main_directory+"web_content/"):
-            if self.is_danish_company(base_url):
-                danish_companies.append(base_url)
-        
-        return danish_companies
+
         
     ########################################################################
     ##                     Network and graph functions                    ##
@@ -1153,7 +1167,8 @@ class webExplorer:
         
     def create_web_network_graph(self):
         ''' Functions that creates a NetworkX network visualization from the 
-        explored pages '''
+        explored pages 
+        For documentation about NetworkX, check : https://networkx.github.io/'''
         #Create a directed graph
         web_graph=nx.DiGraph()
         # Add our start nodes first to the graph, as the center.
@@ -1187,7 +1202,7 @@ class webExplorer:
         plt.savefig(self.main_directory+"DTU network.png",dpi=40)
         plt.show()
     
-    def export_csv_dataset_for_GEPHI(self, danish_companies_filtering=True):
+    def export_csv_dataset_for_GEPHI(self, danish_companies_filtering=True,name="GEPHI"):
         ''' Function exporting a CSV dataset based on the exploration the 
         made earlier. It requires a back-up of "to_visit_url" in the variable 
         folder (Refer to the back_up_to_visit_url() function)
@@ -1199,7 +1214,7 @@ class webExplorer:
         last_id = 0 #Keep track of the highest ID number that was given        
 
         #Start a new CSV file
-        nodes_output_file = open(self.main_directory + "graphs/GEPHI_nodes.csv", "wb")
+        nodes_output_file = open(self.main_directory + "graphs/"+name+"_nodes.csv", "wb")
         #Write the headers : 
         nodes_output_file.write('Id,Label\r\n')
         
@@ -1226,7 +1241,7 @@ class webExplorer:
         nodes_output_file.close()
         
         #Now we register the edges and save them into a CSV as well
-        edges_output_file = open(self.main_directory + "graphs/GEPHI_edges.csv", "wb")
+        edges_output_file = open(self.main_directory + "graphs/"+name+"_edges.csv", "wb")
         edges_output_file.write('Source,Target\r\n') #Write the headers 
         
         #Look up our website IDs and check their connections : 
