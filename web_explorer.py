@@ -491,7 +491,10 @@ class webExplorer:
                     #Remove eventual trailing "/"
                     if link[0] == "/" : 
                         link = link[1:]
-                        
+                    
+                    if link[0:1] == "./": #Remove the ./ at the beginning, if any
+                        link = link[2:]
+                    
                     # Remove parameters or anchors
                     link = link.split('#')[0]
                     #link = link.split('?')[0]
