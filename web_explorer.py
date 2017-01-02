@@ -28,6 +28,8 @@ Last modified : 08/12/2016 by Nicolas Obriot
 import os.path, glob, os
 import shutil #Remove directories with files
 import urllib2 as url #Open URLs
+from urllib2 import HTTPError
+
 import re #Regex
 from bs4 import BeautifulSoup #HTML parsing
 import pickle #Saving Python variables
@@ -41,6 +43,9 @@ from pdfminer.pdfpage import PDFPage
 
 #Extract text from docx documents
 from docx import opendocx, getdocumenttext
+
+# Custom class defined in the WebExplorer package : Watchdog timer
+from watchdog import watchdogException, Watchdog
 
 #Plotting and network visualization
 import networkx as nx
@@ -89,13 +94,15 @@ class webExplorer:
         self.danish_dict = None
         self.english_dict = None
 
-        # CVR number registry
-        self.CVR_registry = dict() # We will store it the following way : CVR_registry['website'] = "12345343" or = None
-
         # Sets of base URLs (website url) 
         # NOT USED AT THE MOMENT
         self.DTU_base_urls=set() # Domain name part of DTU
         self.non_DTU_base_urls = set() # Domain name not part of DTU
+        
+        # Watchdog timer : 
+        self._watchdog = Watchdog()
+        #Marker for exploration to be completed : 
+        self._exploration_complete = False
         
         #Create the needed folders (if they do not exist) for our web explorer : 
         self.create_folder(self.main_directory + "web_content")
@@ -228,66 +235,87 @@ class webExplorer:
             Returns a list object with the list of Links found on the target_url'''
         if len(self.to_visit_urls) == 0:
             print "WARNING : You have not defined any start point for the exploration"
+            
+        #This usually takes long and is bug-risky, so we start the watchdog : 
+        self._watchdog.start()
 
-        # website will go as many levels as the degree_depth_level variable indicates.
-        for i in range(self.degree_depth_level):
-            self.to_visit_urls.append(set())
-            for webpage in self.to_visit_urls[i]:
-                if webpage not in self.webpages_to_skip: #Proceed with the website only if it reachable
-                    #Prepare the variable that we add into the future URL to visit
-                    external_base_urls = set()
-    
-                    # == The base URL has already been visited and we know the external URLs for this redirect count
-                    if os.path.isfile(self.main_directory+"web_content/"+webpage+"/external_urls_"+str(self.redirect_count)+"_redirect.p"):
-                        if not re.match("^[\.]+$",webpage): ## TODO : This is ugly, should be removed if possible (added it because some of the external_urls(redirect_count).p contain . as a base URL and is not filtered when loaded again)
-                            if self.verbose:  #Anouncement message                     
-                                print webpage + " has already been visited, loading external URLs..."
-                            filename = self.main_directory+"web_content/"+webpage+"/external_urls_"+str(self.redirect_count)+"_redirect.p"
-                            external_base_urls=pickle.load(open(filename, "rb" ))
-    
-                    # == The base URL has not been visited yet
-                    else:
-                        # 1) Create a folder for the website in the content folder. Create sub-folders "cleartext" and "linklist"
-                        if self.verbose:  #Anouncement message 
-                            print "Preparing folders for " + webpage
-                        self.create_folder(self.main_directory+"web_content/"+webpage)
-                        self.create_folder(self.main_directory+"web_content/"+webpage+"/cleartext")
-                        self.create_folder(self.main_directory+"web_content/"+webpage+"/linklist")
-    
-                        # 2) Prepare a variable which contains all the external websites found from the website
-                        internal_urls = set()
-                        internal_urls.add("") #We put the base URL up on the list as the first internal URL to visit
-    
-                        # 3) Explore within the website
-                        for j in range(self.redirect_count): # How many times we will follow redirections within the same website
-                            # Scan the URL (retrieve the content, internal links and external links)
-                            print "Scanning "+webpage + " iteration " + str(j+1)
-                            for internal_page in internal_urls:
-                                #If the webpage is malfunctioning or unreachable, we just skip it for now and try again later
-                                if webpage  in self.webpages_to_skip:
-                                    break #Get out of the loop and abort this website
-                                # else : Scan the webpage
-                                all_links = self.URL_scan(webpage, internal_page)
-    
-                                # Find the internal links and add them to the discovery for the next iteration
-                                internal_urls= internal_urls.union(self.find_internal_links(webpage,all_links))
-    
-                                # Find external base URLs and add them to the list of external URLs.
-                                external_base_urls= external_base_urls.union(self.find_external_base_urls(webpage,all_links))
-    
-                        # When done for the website, we save the external base URLs
-                        filename = self.main_directory+"web_content/"+webpage+"/external_urls_"+str(self.redirect_count)+"_redirect.p"
-                        pickle.dump(external_base_urls,open(filename, "wb" ))
-    
-                    # Add all the new found websites to the list of website to visit at the next "Web level"
-                    #print "Found external base URLs : "
-                    #print external_base_urls
-                    self.to_visit_urls[i+1]=self.to_visit_urls[i+1].union(external_base_urls)
-                    self.back_up_to_visit_url()
-    
-                    if self.verbose:  #Anouncement message
-                        print 'Finished webpage ' +webpage
-            print 'Finished web level %d' %(i+1) #So we know how far it went on the console
+        while not self._exploration_complete:
+            try:
+                # website will go as many levels as the degree_depth_level variable indicates.
+                for i in range(self.degree_depth_level):
+                    while len(self.to_visit_urls) < i+2 : #Need to allocate the to_visit_urls[i+1]
+                        self.to_visit_urls.append(set())
+                    for webpage in self.to_visit_urls[i]:
+                        
+                        # At each new page, we kick the watchdog :                 
+                        self._watchdog.kick()
+                        
+                        if webpage not in self.webpages_to_skip: #Proceed with the website only if it reachable
+                            #Prepare the variable that we add into the future URL to visit
+                            external_base_urls = set()
+            
+                            # == The base URL has already been visited and we know the external URLs for this redirect count
+                            if os.path.isfile(self.main_directory+"web_content/"+webpage+"/external_urls_"+str(self.redirect_count)+"_redirect.p"):
+                                if not re.match("^[\.]+$",webpage): ## TODO : This is ugly, should be removed if possible (added it because some of the external_urls(redirect_count).p contain . as a base URL and is not filtered when loaded again)
+                                    if self.debug:  #Anouncement message                     
+                                        print webpage + " has already been visited, loading external URLs..."
+                                    filename = self.main_directory+"web_content/"+webpage+"/external_urls_"+str(self.redirect_count)+"_redirect.p"
+                                    external_base_urls=pickle.load(open(filename, "rb" ))
+            
+                            # == The base URL has not been visited yet
+                            else:
+                                # 1) Create a folder for the website in the content folder. Create sub-folders "cleartext" and "linklist"
+                                if self.verbose:  #Anouncement message 
+                                    print "Preparing folders for " + webpage
+                                self.create_folder(self.main_directory+"web_content/"+webpage)
+                                self.create_folder(self.main_directory+"web_content/"+webpage+"/cleartext")
+                                self.create_folder(self.main_directory+"web_content/"+webpage+"/linklist")
+            
+                                # 2) Prepare a variable which contains all the external websites found from the website
+                                internal_urls = set()
+                                internal_urls.add("") #We put the base URL up on the list as the first internal URL to visit
+            
+                                # 3) Explore within the website
+                                for j in range(self.redirect_count): # How many times we will follow redirections within the same website
+                                    # Scan the URL (retrieve the content, internal links and external links)
+                                    print "Scanning "+webpage + " iteration " + str(j+1)
+                                    for internal_page in internal_urls:
+                                        #If the webpage is malfunctioning or unreachable, we just skip it for now and try again later
+                                        if webpage  in self.webpages_to_skip:
+                                            break #Get out of the loop and abort this website
+                                        # else : Scan the webpage
+                                        all_links = self.URL_scan(webpage, internal_page)
+            
+                                        # Find the internal links and add them to the discovery for the next iteration
+                                        internal_urls= internal_urls.union(self.find_internal_links(webpage,all_links))
+            
+                                        # Find external base URLs and add them to the list of external URLs.
+                                        external_base_urls= external_base_urls.union(self.find_external_base_urls(webpage,all_links))
+            
+                                # When done for the website, we save the external base URLs
+                                filename = self.main_directory+"web_content/"+webpage+"/external_urls_"+str(self.redirect_count)+"_redirect.p"
+                                pickle.dump(external_base_urls,open(filename, "wb" ))
+            
+                            # Add all the new found websites to the list of website to visit at the next "Web level"
+                            #print "Found external base URLs : "
+                            #print external_base_urls
+                            self.to_visit_urls[i+1]=self.to_visit_urls[i+1].union(external_base_urls)
+                            self.back_up_to_visit_url()
+            
+                            if self.verbose:  #Anouncement message
+                                print 'Finished website ' +webpage
+                    print 'Finished web level %d' %(i+1) #So we know how far it went on the console
+                    
+                #When fully done, we mark the exploration as done : 
+                self._exploration_complete = True
+            
+            except watchdogException as e:
+                if self.verbose:
+                    print "Restarting WebExplore : %s" % e
+                
+        #Job completed, we can stop the watchdog : 
+        self._watchdog.stop()
+
     ##End of explore()
 
     #This is the function to load the page, save them and find child links:
@@ -320,9 +348,9 @@ class webExplorer:
                 html_response= url.urlopen("http://"+base_url+"/"+internal_page)
                 
                 #If he status code is 404, we create a dummy file, not to try again later
-                if html_response.code == 404:
+                if html_response.code == 404 or html_response.code == 401:
                     self.create_dummy_files(base_url, internal_page)
-                    raise Exception('HTTP Error 404: Not Found')
+                    raise Exception("Page unreachable, creating dummy files")
                 
                 #Read the text response
                 html_text= html_response.read()
@@ -369,18 +397,30 @@ class webExplorer:
                     print "- Saving file " + links_filename
                 pickle.dump(link_list,open(links_filename, "wb" ))
     
-                return link_list
-            except Exception, e:
-                if self.verbose:
-                    print "Exception thrown in URL_scan : %s" % e  #In case the URL could not be opened, we just return nothing
-                if str(e) == "<urlopen error [Errno 111] Connection refused>" :
-                    self.webpages_to_skip.append(base_url)
-                else:
+                return link_list               
+            except HTTPError as e:
+                if e.code > 400 and e.code < 499: 
+                    self.create_dummy_files(base_url, internal_page)
                     if self.verbose:
-                        print "The exception was not '<urlopen error [Errno 111] Connection refused>'"
+                        print "http://"+base_url+"/"+internal_page + " has returned a 4xx Error code. Skipping"
+                
                 #Back off a litle when getting a HTTP error
                 time.sleep(5)
                 return []
+            
+            except Exception as e: #Problem with opening the webpage
+                if self.verbose:
+                    print "Exception thrown in URL_scan : %s" % e  #In case the URL could not be opened, we just return nothing
+                    
+                if str(e) == "<urlopen error [Errno 111] Connection refused>" :
+                    if self.verbose:
+                        print "Website %s has banned us. Skipping" % base_url
+                    self.webpages_to_skip.append(base_url)
+                
+                
+                #Back off a litle when getting a HTTP error
+                time.sleep(5)
+                return []            
         else:
             #Load the list of links from the page in the folder
             if self.debug:  #Show the filename being opened          
