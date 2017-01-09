@@ -3,7 +3,7 @@
 Web_explorer is a small Python web crawler, retrieving text content from the
 websites it visits in order to analyze it afterwards.
 
-* TODO : Nice description
+This software is still a beta version under development, use at your own risk :stuck_out_tongue:
 
 This module allows to specify a list of URLs to start from as a first level. It explores the content the starting website, following a certain amount of hyperlinks within the start website (redirect_count) and subsequently visits the links to other websites found in the previous level.
 
@@ -34,9 +34,14 @@ myWebExplorer.set_exploring_depth(3)
 myWebExplorer.explore()
 ```
 
+The saved websites content will be in "/path/where/you/want/the/files/stored/"
+
 ### License
-The WebExplorer utility is open-source software distributed under the terms and conditions of the Free Software Foundation's [GNU General Public License](http://www.gnu.org/licenses/gpl.html).  
+The WebExplorer utility is open-source software distributed under the terms and conditions of the Free Software Foundation's [GNU General Public License](http://www.gnu.org/licenses/gpl.html). 
 
 ### TODO list
-* Make a quick reset function (which resets the url_redirect_3.p files)
-* Make more comprehensive functions to visualize the website network
+- [x] Make a quick reset function (which resets the url_redirect_3.p files)
+- [ ] Clean-up R corpus creation
+- [ ] Make more comprehensive functions to visualize the website network
+- [ ] Check PDF and Word files support
+- [ ] Find out why advancedbionics.com makes the program crash
