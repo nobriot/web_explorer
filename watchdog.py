@@ -36,7 +36,7 @@ class watchdogException(Exception):
 # Our watchdog class
 class Watchdog():
     ''' Watchdog class, used to ensure that the script execution is still alive'''
-    def __init__(self, timeout=60):
+    def __init__(self, timeout=120):
         ''' Class constructor. Initialize the timeout in case the watchdog is 
         not "kicked" with the kick() function. Timeout is in seconds and the 
         default is a minute. '''

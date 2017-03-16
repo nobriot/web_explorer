@@ -75,7 +75,7 @@ class webExplorer:
         self.webpages_to_skip = [] # A list of webpages that must not be visited at the moment (e.g. our IP was banned temporarly from the website, so skip the attempts)
 
         #LIst of extension, that if we find in a URL, the URL will be discarded
-        self.extensions_to_ignore = ['.*\.[pP][dD][fF].*|^.*[Pp][Dd][fF]$','^.*\.[Xx][lL][sS]$','^.*\.[Dd][oO][cC][mMxX]?$','.*\.[pP][nN][gG].*|^.*[pP][nN][gG]$','.*\.[jJ][Pp][eE]?[gG].*|^.*[jJ][Pp][eE]?[gG]$','.*\.flv.*|^.*flv$','.*\.mp4.*|^.*mp4$','.*\.mov.*|^.*mov$']
+        self.extensions_to_ignore = ['^.*\.[tT][aA][rR]$','^.*\.[gG][zZ]$','^.*\.[Ee][pP][Ss]$','^.*\.[Gg][iI][fF]$','^.*\.[zZ][iI][pP]$','^.*\.[dD][mM][gG]$','^.*\.[eE][xX][eE]$','^.*\.[Xx][lL][sS]$','.*\.[pP][nN][gG].*|^.*[pP][nN][gG]$','.*\.[jJ][Pp][eE]?[gG].*|^.*[jJ][Pp][eE]?[gG]$','.*\.[Tt][Ii][Ff]?[Ff].*|^.*[Tt][Ii][Ff]?[Ff]$','.*\.flv.*|^.*flv$','.*\.mp4.*|^.*mp4$','.*\.mov.*|^.*mov$']
 
         # Set the exploration variables
         self.set_redirect_count(redirect_count)
@@ -143,13 +143,19 @@ class webExplorer:
             # Find the base url and remove the actual URL.                
             base_url_webpage = self.extract_base_url(webpage)
             if base_url_webpage : #The function can return "None" if not found
-                new_to_visit_url_set.add(base_url_webpage)
-                if self.debug:
-                    print "Filtering base URL for : "+ webpage + " - Result : " + base_url_webpage
+                #If it is not at least 2 characters separated by a point, throw it away
+                if re.findall('\w+\.\w+',base_url_webpage): 
+                    new_to_visit_url_set.add(base_url_webpage.split(' ')[0])
+                    if self.debug:
+                        print "Filtering base URL for : "+ webpage + " - Result : " + base_url_webpage
             else : 
-                new_to_visit_url_set.add(webpage)
-                if self.debug:
-                    print "Filtering base URL for : "+ webpage + " - Result : /!\\ None /!\\ -> URL is kept as such "
+                if re.findall('\w+\.\w+',webpage): 
+                    new_to_visit_url_set.add(webpage)
+                    if self.debug:
+                        print "Filtering base URL for : "+ webpage + " - Result : /!\\ None /!\\ -> URL is kept"
+                else:
+                    if self.debug:
+                        print "Filtering base URL for : "+ webpage + " - Result : /!\\ None /!\\ -> URL is thrown away"
             
         #Now take the filtered set and put it into the actual set
         self.to_visit_urls[0] = new_to_visit_url_set
@@ -207,19 +213,37 @@ class webExplorer:
     def load_previous_to_visit_url(self,target_filename=None):
         ''' Function that loads a previously saved to_visit_url with the 
         back_up_to_visit_url() function'''
-        if self.to_visit_urls_back_up_filename : 
-            self.to_visit_urls=pickle.load(open(self.main_directory+"variables/"+self.to_visit_urls_back_up_filename, "rb" ))
-        elif target_filename: 
-            self.to_visit_urls=pickle.load(open(self.main_directory+"variables/"+target_filename, "rb" ))
+        if self.to_visit_urls_back_up_filename:
+            if os.path.isfile(self.main_directory+"variables/"+self.to_visit_urls_back_up_filename):
+                self.to_visit_urls=pickle.load(open(self.main_directory+"variables/"+self.to_visit_urls_back_up_filename, "rb" ))
+            elif target_filename: 
+                self.to_visit_urls=pickle.load(open(self.main_directory+"variables/"+target_filename, "rb" ))
         else:
             if self.debug:
-                print "WARNING : Tried to save URL tree without defining a filename. The file will not be saved"
+                print "WARNING : Tried to load URL tree without defining a filename. his"
     
     # Function to save the name for saving the "to_visit_url" variable
     def set_url_tree_back_up_filename(self, new_name):
         ''' Functions that sets the name for the target file backing up the 
         "to_visit_url" variable. See back_up_to_visit_url() function '''
         self.to_visit_urls_back_up_filename = new_name
+
+    ########################################################################
+    ##                            Get functions                           ##
+    ########################################################################
+    #Function printing how much progress the discovery has made
+    def print_progress(self):
+        ''' Prints how much websites have been visited'''
+        print "Web Explorer discovery progress : " 
+        print "Current depth level : " + str(len(self.to_visit_urls)-1) + "/" + str(self.degree_depth_level)
+        
+        #Let's count how many have been visited
+        visited_website_count = 0
+        for website in self.to_visit_urls[len(self.to_visit_urls)-2]:
+            if os.path.isfile(self.main_directory+"web_content/"+website+"/external_urls_"+str(self.redirect_count)+"_redirect.p"):
+                visited_website_count+=1
+        print "Visited websites : " + str(visited_website_count) + "/" + str(len(self.to_visit_urls[len(self.to_visit_urls)-2])) + " for the current level"
+        
 
     ########################################################################
     ##                   Exploring and parsing functions                  ##
@@ -345,7 +369,7 @@ class webExplorer:
                 if self.debug:  #Show the requested URL
                     print " - Hit http://"+base_url+"/"+internal_page
                 # Make the HTTP query
-                html_response= url.urlopen("http://"+base_url+"/"+internal_page)
+                html_response= url.urlopen("http://"+base_url+"/"+internal_page, timeout=40)
                 
                 #If he status code is 404, we create a dummy file, not to try again later
                 if html_response.code == 404 or html_response.code == 401:
@@ -416,7 +440,18 @@ class webExplorer:
                     if self.verbose:
                         print "Website %s has banned us. Skipping" % base_url
                     self.webpages_to_skip.append(base_url)
-                
+                elif str(e) == "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed (_ssl.c:590)>":
+                    if self.verbose:
+                        print "Website %s is defect. Skipping" % base_url
+                    self.webpages_to_skip.append(base_url)
+                elif str(e) == "<urlopen error [Errno -5] No address associated with hostname>":
+                    if self.verbose:
+                        print "Website %s does not exist. Skipping" % base_url
+                    self.webpages_to_skip.append(base_url)
+                elif str(e) == "[Errno 104] Connection reset by peer":
+                    if self.verbose:
+                        print "Website %s banned us permanently or temporarily. Skipping" % base_url
+                    self.webpages_to_skip.append(base_url)
                 
                 #Back off a litle when getting a HTTP error
                 time.sleep(5)
@@ -514,7 +549,7 @@ class webExplorer:
                         #Remove eventual trailing "/" and "//"
                         while '//' in relative_path:
                             relative_path=relative_path.replace('//','/')
-                        if len(relative_path) >1 :
+                        if len(relative_path) >0 :
                             if relative_path[0] == "/": 
                                 relative_path = relative_path[1:]                        
                         
@@ -574,6 +609,7 @@ class webExplorer:
             for extension in self.extensions_to_ignore:
                 if re.match(extension,link):
                     keep_link = False
+
             #No poisonous extension found, so we proceed.
             if keep_link:
                 if "javascript:" in link.lower() or "mailto:" in link.lower():
@@ -639,6 +675,7 @@ class webExplorer:
         #Returns the soup object
         return soup
 
+
     def find_child_links_from_html_soup(self,html_soup,target_url):
         ''' Takes the beautifulSoup soup and url it comes from
         returns a List of all the links (href in a <a> tag found from the
@@ -670,6 +707,7 @@ class webExplorer:
             URLList.remove(None)
 
         return URLList
+
 
     def get_child_links_from_file(self,target_url):
         ''' This function finds the child links from the HTML content of the page
@@ -863,9 +901,9 @@ class webExplorer:
             #Look at the returns when we are done
             total_words = len(word_list)
 
-            if self.debug:  #Debug : Set word count details
-                print "Danish word percentage : "+str(float(danish_word_count)/total_words*100)
-                print "English word percentage : "+str(float(english_word_count)/total_words*100)
+            #if self.debug:  #Debug : Set word count details
+            #    print "Danish word percentage : "+str(float(danish_word_count)/total_words*100)
+            #    print "English word percentage : "+str(float(english_word_count)/total_words*100)
 
             #Now we decide what we return: 50 for danish as all the words with å æ ø are not counted
             if float(danish_word_count)/total_words*100 > 45 and danish_word_count>english_word_count:
