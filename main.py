@@ -46,8 +46,7 @@ if __name__ == '__main__':
 
     ## Exploring configuration
     myWebExplorer.set_redirect_count(3)
-    myWebExplorer.set_exploring_depth(3)
-    myWebExplorer.set_exploring_depth(1) #Use this one for suggested websites
+    myWebExplorer.set_exploring_depth(1) #Use 1 level for suggested websites
 
     ## Reset previous result (maintenance functions):
     #myWebExplorer.clear_all_link_lists()
@@ -79,7 +78,7 @@ if __name__ == '__main__':
     myWebExplorer.create_R_corpuses("English") #Remember to erase the previous corpus if you want to upadate the existing pages
     #myWebExplorer.create_R_corpus("Danish")
 
-    ## 6) Play with the resust :
+    ## 6) Play with the result :
     #myWebExplorer.list_danish_companies()
 
     ## 7) Create a network graph
@@ -96,12 +95,3 @@ if __name__ == '__main__':
 #myWebExplorer.set_verbose(True)
 #myWebExplorer.set_debug(True)
 #myWebExplorer.URL_scan("kom.aau.dk","group/12gr1010/Report.pdf")
-
-##In order to check how many websites are left from the 1st level :
-#import os
-#num = 0
-#for website in myWebExplorer.to_visit_urls[0]:
-#    if not os.path.isfile("/home/shared/Scripts/web_explorer/web_content/"+website+"/external_urls_"+str(myWebExplorer.redirect_count)+"_redirect.p"):
-#        num+=1
-#
-#print str(num) + " sites to visits out of " +str(len(myWebExplorer.to_visit_urls[0]))
