@@ -74,8 +74,7 @@ if __name__ == '__main__':
 
     ## 5) Create a R corpus for a certain language - Stored in "main_directory"/web_content/corpus/"Language"
     print "5) Creating a corpus"
-    #myWebExplorer.reset_R_corpus("English")
-    myWebExplorer.create_R_corpuses("English") #Remember to erase the previous corpus if you want to upadate the existing pages
+    myWebExplorer.create_R_corpuses("English") #Warning it removes the old corpus
     #myWebExplorer.create_R_corpus("Danish")
 
     ## 6) Play with the result :

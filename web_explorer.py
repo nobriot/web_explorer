@@ -245,6 +245,17 @@ class webExplorer:
         print "Visited websites : " + str(visited_website_count) + "/" + str(len(self.to_visit_urls[len(self.to_visit_urls)-2])) + " for the current level"
         
 
+    # function returning a list of all visited website within the current discovery
+    def get_visited_websites(self):
+        '''!@brief Returns a list of all visited website in the current discovery'''
+        #A bit the same as print_progress, but add into the list everytime
+        website_list = []
+        for website in self.to_visit_urls[len(self.to_visit_urls)-2]:
+            if os.path.isfile(self.main_directory+"web_content/"+website+"/external_urls_"+str(self.redirect_count)+"_redirect.p"):
+                website_list.append(website)
+        
+        return website_list
+        
     ########################################################################
     ##                   Exploring and parsing functions                  ##
     ########################################################################
@@ -916,10 +927,12 @@ class webExplorer:
             return None
 
 
-    def create_R_corpus(self,language):
+    def create_R_corpus(self,language,all_data=False):
         ''' Create a corpus of files for R from the working directory.
-        - language parameter has to a supported language by returned by the find_language() function. 
-        Currently it is either "Danish" or "English"
+        @param Language : has to a supported language by returned by the 
+        find_language() function.  Currently it is either "Danish" or "English"
+        @param all_data : takes websites associated to current discovery only (False) 
+        or all data available from previous discoveries/explorations (True)
         The corpus is placed in the corpus/ folder, followed by the language'''
 
         #Check whether the language is supported :
@@ -927,9 +940,18 @@ class webExplorer:
             print 'ERROR : Input language is incorrect : ' + language
             print 'The corpus will not be created. Exiting...'
             return
+            
+        #Reset the corpus if it is already here:
+        self.reset_R_corpus(language)
+            
+        #pick website list from all ever discovered content or only current content : 
+        if all_data:
+            website_list = os.listdir(self.main_directory+"web_content/")
+        else:
+            website_list = self.get_visited_websites()
 
         #For each website, the corpus file corresponding will be a concatenation of all the content
-        for base_url in os.listdir(self.main_directory+"web_content/"):
+        for base_url in website_list:
             # Now small test to see whether the website should be part of the corpus or not
             should_take_url = False
         
@@ -974,10 +996,12 @@ class webExplorer:
         #I guess that's it.
                 
                 
-    def create_R_corpuses(self,language):
+    def create_R_corpuses(self,language,all_data=False):
         ''' Create a corpus of files for R from the working directory.
         - Each site is a folder with its own corpora 
-        Language :  Currently it is either "Danish" or "English"
+        @param Language : Currently it is either "Danish" or "English"
+        @param all_data : takes websites associated to current discovery only (False) 
+        or all data available from previous discoveries/explorations (True)
         The corpuses are placed in the corpus/ folder, followed by the language'''
 
         #Check whether the language is supported :
@@ -985,9 +1009,18 @@ class webExplorer:
             print 'ERROR : Input language is incorrect : ' + language
             print 'The corpus will not be created. Exiting...'
             return
+                
+        #Reset the corpus if it is already here:
+        self.reset_R_corpus(language)
+            
+        #pick website list from all ever discovered content or only current content : 
+        if all_data:
+            website_list = os.listdir(self.main_directory+"web_content/")
+        else:
+            website_list = self.get_visited_websites()
 
         #For each website, the corpus file corresponding will be a concatenation of all the content
-        for base_url in os.listdir(self.main_directory+"web_content/"):
+        for base_url in website_list:
             # Now small test to see whether the website should be part of the corpus or not
             should_take_url = False
         
@@ -1033,7 +1066,7 @@ class webExplorer:
         #I guess that's it.
                     
     def reset_R_corpus(self,language) :
-        ''' Functiont that resets the R corpus by erasing the files for a clean
+        ''' Function that resets the R corpus by erasing the files for a clean
         re-creation of the corpus '''
         
         #Check whether the language is supported :
@@ -1044,7 +1077,17 @@ class webExplorer:
         
         folder = self.main_directory+"corpus/"+language+"/"
         for filename in os.listdir(folder):
-             os.remove(folder+ filename)
+            if os.path.isfile(folder+ filename):
+                os.remove(folder+ filename)
+            elif os.path.isdir(folder+ filename):
+                #If it is a folder, delete everything that's inside
+                for root, dirs, files in os.walk(folder+ filename, topdown=False):
+                    for name in files:
+                        os.remove(os.path.join(root, name))
+                    for name in dirs:
+                        os.rmdir(os.path.join(root, name))
+                #Then remove the folder itself
+                os.rmdir(folder+ filename)
             
 
     def clean_up_double_line_returns_and_spaces(self,text):
