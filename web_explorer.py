@@ -80,6 +80,7 @@ class webExplorer:
         # Set the exploration variables
         self.set_redirect_count(redirect_count)
         self.set_exploring_depth(degree_depth_level)
+        self._maximum_pages_per_website = 1000 #Abort visiting a website that contains more pages than this amount.
 
         # different url list
         self.to_visit_urls = [] # Which URL are yet to visit
@@ -169,6 +170,12 @@ class webExplorer:
             self.redirect_count = redirect_count
         else:
             self.redirect_count = 1 #How many links we will follow (site1.page1 -> site1.page3 -> site1.page3 is 3 levels)
+            
+    def set_maximum_pages_per_website(self,maximum_pages_per_website=1000):
+        ''' This function takes an int as an argument and sets the amount of
+        redirections followed per website '''
+        if type(maximum_pages_per_website) is int:
+            self._maximum_pages_per_website = maximum_pages_per_website
 
     # Set the depth for external websites exploration :
     def set_exploring_depth(self,degree_depth_level=None):
@@ -255,7 +262,18 @@ class webExplorer:
                 website_list.append(website)
         
         return website_list
+    
+    #Function taht returns the number of pages already present for a website
+    def get_number_of_discovered_pages(self, website):
+        '''!@brief Returns the number of pages visited for a given website by
+        looking up how many files are present in the corresponding website folder'''
+        webpage_count = 0
+        if os.path.isdir(self.main_directory+"web_content/"+website+"/cleartext/"):
+            for webpage_file in  os.listdir(self.main_directory+"web_content/"+website+"/cleartext/") :
+                if os.path.isfile(self.main_directory+"web_content/"+website+"/cleartext/"+webpage_file):
+                    webpage_count+=1
         
+        return webpage_count
     ########################################################################
     ##                   Exploring and parsing functions                  ##
     ########################################################################
@@ -309,27 +327,37 @@ class webExplorer:
                                 # 2) Prepare a variable which contains all the external websites found from the website
                                 internal_urls = set()
                                 internal_urls.add("") #We put the base URL up on the list as the first internal URL to visit
-            
+                                
+                                #Count the number of already visites pages
+                                visited_pages_for_current_website = self.get_number_of_discovered_pages(webpage)
+                                if self.verbose: #Anouncement message 
+                                    print "Number of visited pages within "+webpage+" : "+str(visited_pages_for_current_website)
+        
                                 # 3) Explore within the website
                                 for j in range(self.redirect_count): # How many times we will follow redirections within the same website
                                     # Scan the URL (retrieve the content, internal links and external links)
                                     print "Scanning "+webpage + " iteration " + str(j+1)
+                                        
                                     for internal_page in internal_urls:
                                         #If the webpage is malfunctioning or unreachable, we just skip it for now and try again later
                                         if webpage  in self.webpages_to_skip:
                                             break #Get out of the loop and abort this website
+                                        #If the number of visited pages for this site is too high, skip for now
+                                        if visited_pages_for_current_website >= self._maximum_pages_per_website:
+                                            break
                                         # else : Scan the webpage
                                         all_links = self.URL_scan(webpage, internal_page)
-            
                                         # Find the internal links and add them to the discovery for the next iteration
                                         internal_urls= internal_urls.union(self.find_internal_links(webpage,all_links))
-            
                                         # Find external base URLs and add them to the list of external URLs.
                                         external_base_urls= external_base_urls.union(self.find_external_base_urls(webpage,all_links))
+                                        # increment the number of visited pages
+                                        visited_pages_for_current_website+=1                                        
             
                                 # When done for the website, we save the external base URLs
-                                filename = self.main_directory+"web_content/"+webpage+"/external_urls_"+str(self.redirect_count)+"_redirect.p"
-                                pickle.dump(external_base_urls,open(filename, "wb" ))
+                                if webpage not in self.webpages_to_skip:
+                                    filename = self.main_directory+"web_content/"+webpage+"/external_urls_"+str(self.redirect_count)+"_redirect.p"
+                                    pickle.dump(external_base_urls,open(filename, "wb" ))
             
                             # Add all the new found websites to the list of website to visit at the next "Web level"
                             #print "Found external base URLs : "
