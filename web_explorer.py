@@ -71,12 +71,11 @@ class webExplorer:
         self.set_main_directory(main_directory)
 
         # A list of websites we do not want to visit at all.
-        self.url_blacklist= ".*google\..*|.*facebook\..*|.*instagram\..*|.*youtube\..*|.*twitter\..*|.*linkedin\..*|.*youtu\.be.*|.*goo\.gl.*|.*flickr\..*|.*bing\..*|.*itunes\..*|.*dropbox\..*|.*independent\.co.*" #All the websites we want to ignore
+        self.url_blacklist= ".*google\..*|.*facebook\..*|.*instagram\..*|.*youtube\..*|.*twitter\..*|.*linkedin\..*|.*youtu\.be.*|.*goo\.gl.*|.*flickr\..*|.*bing\..*|.*itunes\..*|.*dropbox\..*|.*independent\.co.*|.*statoil\.com.*|.*babcock\.com.*|.*panasonic\.com.*|.*largestcompanies\.com.*" #All the websites we want to ignore
         self.webpages_to_skip = [] # A list of webpages that must not be visited at the moment (e.g. our IP was banned temporarly from the website, so skip the attempts)
 
         #LIst of extension, that if we find in a URL, the URL will be discarded
-        self.extensions_to_ignore = ['^.*\.[tT][aA][rR]$','^.*\.[gG][zZ]$','^.*\.[Ee][pP][Ss]$','^.*\.[Gg][iI][fF]$','^.*\.[zZ][iI][pP]$','^.*\.[dD][mM][gG]$','^.*\.[eE][xX][eE]$','^.*\.[Xx][lL][sS]$','.*\.[pP][nN][gG].*|^.*[pP][nN][gG]$','.*\.[jJ][Pp][eE]?[gG].*|^.*[jJ][Pp][eE]?[gG]$','.*\.[Tt][Ii][Ff]?[Ff].*|^.*[Tt][Ii][Ff]?[Ff]$','.*\.flv.*|^.*flv$','.*\.mp4.*|^.*mp4$','.*\.mov.*|^.*mov$']
-
+        self.extensions_to_ignore = ['^.*\.[tT][aA][rR]$','^.*\.[gG][zZ]$','^.*\.[Ee][pP][Ss]$','^.*\.[Gg][iI][fF]$','^.*\.[zZ][iI][pP]$','^.*\.[dD][mM][gG]$','^.*\.[eE][xX][eE]$','^.*\.[Xx][lL][sS]$','.*\.[pP][nN][gG].*|^.*[pP][nN][gG]$','.*\.[jJ][Pp][eE]?[gG].*|^.*[jJ][Pp][eE]?[gG]$','.*\.[Tt][Ii][Ff]?[Ff].*|^.*[Tt][Ii][Ff]?[Ff]$','.*\.flv.*|^.*flv$','.*\.mp4.*|^.*mp4$','.*\.mov.*|^.*mov$','^.*\.[mM][sS][iI]$']
         # Set the exploration variables
         self.set_redirect_count(redirect_count)
         self.set_exploring_depth(degree_depth_level)
