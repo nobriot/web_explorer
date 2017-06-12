@@ -220,13 +220,22 @@ class webExplorer:
         ''' Function that loads a previously saved to_visit_url with the 
         back_up_to_visit_url() function'''
         if self.to_visit_urls_back_up_filename:
-            if os.path.isfile(self.main_directory+"variables/"+self.to_visit_urls_back_up_filename):
-                self.to_visit_urls=pickle.load(open(self.main_directory+"variables/"+self.to_visit_urls_back_up_filename, "rb" ))
-            elif target_filename: 
-                self.to_visit_urls=pickle.load(open(self.main_directory+"variables/"+target_filename, "rb" ))
+            #Save the current variable before trying to change it.
+            back_up_to_visit_url = self.to_visit_urls
+            try:
+                if os.path.isfile(self.main_directory+"variables/"+self.to_visit_urls_back_up_filename):
+                    self.to_visit_urls=pickle.load(open(self.main_directory+"variables/"+self.to_visit_urls_back_up_filename, "rb" ))
+                elif target_filename: 
+                    self.to_visit_urls=pickle.load(open(self.main_directory+"variables/"+target_filename, "rb" ))
+            except:
+                #Pickle file is corrupt, revert
+                self.to_visit_urls = back_up_to_visit_url
+                #Erase the corrupted file
+                if os.path.isfile(self.main_directory+"variables/"+self.to_visit_urls_back_up_filename):
+                    os.remove(self.main_directory+"variables/"+self.to_visit_urls_back_up_filename)
         else:
             if self.debug:
-                print "WARNING : Tried to load URL tree without defining a filename. his"
+                print "WARNING : Tried to load URL tree without defining a filename."
     
     # Function to save the name for saving the "to_visit_url" variable
     def set_url_tree_back_up_filename(self, new_name):
