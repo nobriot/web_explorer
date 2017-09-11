@@ -81,6 +81,7 @@ class webExplorer:
         self.set_redirect_count(redirect_count)
         self.set_exploring_depth(degree_depth_level)
         self._maximum_pages_per_website = 1000 #Abort visiting a website that contains more pages than this amount.
+        self._maximum_pages_size = 3000000 #Do not retrive pages larger than 30Mb
 
         # different url list
         self.to_visit_urls = [] # Which URL are yet to visit
@@ -427,6 +428,12 @@ class webExplorer:
                 if html_response.code == 404 or html_response.code == 401:
                     self.create_dummy_files(base_url, internal_page)
                     raise Exception("Page unreachable, creating dummy files")
+                    
+                #Check the headers for the size of the page. Discard anything more than 30Mb
+                html_headers=html_response.get_info()
+                if html_headers['Content-Length'] > self._maximum_pages_size :
+                    self.create_dummy_files(base_url, internal_page)
+                    raise Exception("Page too large (>30Mb), skipping and creating dummy files")
                 
                 #Read the text response
                 html_text= html_response.read()
