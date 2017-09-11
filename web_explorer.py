@@ -29,6 +29,7 @@ import os.path, glob, os
 import shutil #Remove directories with files
 import urllib2 as url #Open URLs
 from urllib2 import HTTPError
+import socket
 
 import re #Regex
 from bs4 import BeautifulSoup #HTML parsing
@@ -103,6 +104,10 @@ class webExplorer:
         self._watchdog = Watchdog()
         #Marker for exploration to be completed : 
         self._exploration_complete = False
+        
+        # timeout in seconds
+        self._socket_timeout = 40
+        socket.setdefaulttimeout(self._socket_timeout)
         
         #Create the needed folders (if they do not exist) for our web explorer : 
         self.create_folder(self.main_directory + "web_content")
@@ -416,7 +421,7 @@ class webExplorer:
                 if self.debug:  #Show the requested URL
                     print " - Hit http://"+base_url+"/"+internal_page
                 # Make the HTTP query
-                html_response= url.urlopen("http://"+base_url+"/"+internal_page, timeout=40)
+                html_response= url.urlopen("http://"+base_url+"/"+internal_page, timeout=self._socket_timeout)
                 
                 #If he status code is 404, we create a dummy file, not to try again later
                 if html_response.code == 404 or html_response.code == 401:
