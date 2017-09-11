@@ -431,9 +431,15 @@ class webExplorer:
                     
                 #Check the headers for the size of the page. Discard anything more than 30Mb
                 html_headers=html_response.info()
-                if html_headers['Content-Length'] > self._maximum_pages_size :
-                    self.create_dummy_files(base_url, internal_page)
-                    raise Exception("Page too large (>30Mb), skipping and creating dummy files")
+                if 'Content-Length' in html_headers:
+                    if int(html_headers['Content-Length']) > self._maximum_pages_size :
+                        self.create_dummy_files(base_url, internal_page)
+                        raise Exception("Page too large (>30Mb), skipping and creating dummy files")
+                #If the headers contains the language and it is not english, throw away
+                if 'Content-language' in html_headers:
+                    if 'en' not in html_headers['Content-language'] and 'dk' not in html_headers['Content-language'] :
+                        self.create_dummy_files(base_url, internal_page)
+                        raise Exception("Undesired language, skipping and creating dummy files")
                 
                 #Read the text response
                 html_text= html_response.read()
