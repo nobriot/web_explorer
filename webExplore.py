@@ -51,7 +51,7 @@ if __name__ == '__main__':
     print "Working directory: "+ myWebExplorer.main_directory
 
     # 3) Add url as start point
-    print "Startpoint URLs : " +  "".join(args.start_website)
+    print "Startpoint URLs : " +  ", ".join(args.start_website)
     myWebExplorer.set_explore_start_points(args.start_website)
 
     if args.redirect_count is not None :
@@ -72,3 +72,4 @@ if __name__ == '__main__':
 
     # Explore the web pages :
     myWebExplorer.explore()
+    
